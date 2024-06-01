@@ -1,12 +1,16 @@
 [tool.poetry]
 name = "fluxpro"
 version = "0.1.0"
-description = ""
-authors = ["Your Name <you@example.com>"]
+description = "Process data from Teledyne NOy analyser and FTIR"
+authors = [
+  "James Gardner <james.gardner1421@gmail.com>",
+  "Megan Purchase <megpurch2798@gmail.com>",
+]
 readme = "README.md"
+repository = "https://github.com/MeganPurchase/fluxpro"
 
 [tool.poetry.dependencies]
-python = "^3.12"
+python = "^3.8"
 pandas = "^2.2.2"
 numpy = "^1.26.4"
 
