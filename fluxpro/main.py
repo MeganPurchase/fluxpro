@@ -2,6 +2,17 @@ import argparse
 import numpy as np
 import pandas as pd
 import sys
+from pathlib import Path
+
+GREEN = "\033[32m"
+RESET = "\033[0m"
+ASCII_ART = """\
+ ___ _
+|  _| |_ _ _ _ ___ ___ ___
+|  _| | | |_'_| . |  _| . |
+|_| |_|___|_,_|  _|_| |___|
+              |_|
+"""
 
 
 def assign_row_labels(df, cycles, sample_time, samples):
@@ -18,27 +29,49 @@ def remove_transition_minutes(df, sample_time, buffer):
     return gdf.tail(sample_time - buffer)
 
 
-def compute_averages(df):
-    def aggregate_column(gdf, column: str):
-        result = gdf.agg(mean=(column, "mean"), std=(column, "std"), sem=(column, "sem"))
-        result["gas"] = column.split(" / ")[0]
-        return result
-
-    gdf = df.groupby(["sample", "cycle"])
-    datacols = [column for column in df if "ppm (cal)" in column]
-    all_dfs = [aggregate_column(gdf, column) for column in datacols]
-    return pd.concat(all_dfs)
+def filter_relevant_columns(df):
+    regex = r"(cycle|sample|ppm \(cal\)|Conc)"
+    return df.filter(regex=regex)
 
 
-def subtract_blank_mean(df, blank):
+def reformat_data(df):
+    return df.melt(id_vars=["cycle", "sample"], var_name="gas")
+
+
+def subtract_blank(df, blank):
     gdf = df.groupby("sample")
     non_blanks = gdf.filter(lambda x: x.name != blank).reset_index()
+
     blank = gdf.filter(lambda x: x.name == blank).reset_index()
     blank.drop(columns=["sample"], inplace=True)
+    blank = blank.groupby(["cycle", "gas"]).agg(mean_blank=("value", "mean")).reset_index()
 
     df = non_blanks.merge(blank, how="left", on=["cycle", "gas"], suffixes=("", "_blank"))
-    df["mean_reduced"] = df["mean"] - df["mean_blank"]
-    return df
+    df["value_reduced"] = df["value"] - df["mean_blank"]
+
+    return df.drop(columns=["index"])
+
+
+def compute_averages(df):
+    return df.groupby(["sample", "cycle", "gas"]).agg(
+        mean=("value_reduced", "mean"), std=("value_reduced", "std"), sem=("value_reduced", "sem")
+    )
+
+
+def write_output(df, output_directory, suffix):
+    def write(group):
+        fname = group.name
+        if "ppm (cal)" in group.name:
+            fname = group.name.split(" / ")[0].replace(" ", "_").lower()
+        elif "Conc" in group.name:
+            fname = group.name.strip().split(" ")[0].lower()
+
+        group = group.reset_index()
+        group.drop(columns="gas", inplace=True)
+        group.to_csv(output_directory / f"{fname}_{suffix}.csv", index=False)
+
+    output_directory.mkdir(exist_ok=True)
+    df.groupby("gas").apply(write)
 
 
 parser = argparse.ArgumentParser(
@@ -62,35 +95,55 @@ parser.add_argument(
 parser.add_argument(
     "--out",
     "-o",
-    type=str,
-    default="out.csv",
-    help="name of output file",
+    type=Path,
+    default="output",
+    help="name of output directory",
 )
+parser.add_argument(
+    "--header",
+    type=int,
+    default=0,
+    help="line number of the header",
+)
+
+
+def print_header(args):
+    print(f"{GREEN}{ASCII_ART}{RESET}")
+    print("Cycles:", args.cycles)
+    print("Samples:", args.samples)
+    print("Sample time:", args.sample_time)
+    print("Blank index:", args.blank)
+    print("Buffer minutes:", args.buffer)
+    print("Output directory:", args.out)
+    print("Header index:", args.header)
+    print()
 
 
 def main():
     args = parser.parse_args()
 
-    GREEN = "\033[32m"
-    BLUE = "\033[34m"
-    RESET = "\033[0m"
+    print_header(args)
 
-    print(f"{GREEN}Reading data from {BLUE}`{args.input_file}`{GREEN}.{RESET}")
-    df = pd.read_csv(args.input_file, header=2)
+    print(f"Reading data from {GREEN}`{args.input_file}`{RESET}.")
+    df = pd.read_csv(args.input_file, header=args.header)
 
     df = assign_row_labels(df, args.cycles, args.sample_time, args.samples)
 
     df = remove_transition_minutes(df, args.sample_time, args.buffer)
-    print(f"{GREEN}Deleted {args.buffer} minutes from the beginning of each sample.{RESET}")
+    print(f"Deleted {args.buffer} minutes from the beginning of each sample.")
 
-    print(f"{GREEN}Computing averages.{RESET}")
+    df = filter_relevant_columns(df)
+    df = reformat_data(df)
+
+    print("Subtracting the blank.")
+    df = subtract_blank(df, args.blank)
+    write_output(df.set_index(["sample", "cycle", "gas"]), args.out, "all")
+
+    print("Computing averages.")
     df = compute_averages(df)
 
-    print(f"{GREEN}Subtracting the blank.{RESET}")
-    df = subtract_blank_mean(df, args.blank)
-
-    df.to_csv(args.out, index=False)
-    print(f"{GREEN}Results written to {BLUE}`{args.out}`{GREEN}.{RESET}")
+    write_output(df, args.out, "avg")
+    print(f"Results written to {GREEN}`{args.out}`{RESET}.")
 
 
 if __name__ == "__main__":
