@@ -58,6 +58,11 @@ def compute_averages(df):
     )
 
 
+def calculate_flux(df, flow, chamber_volume, soil_surface_area):
+    df["flux"] = df["mean"] * flow * (chamber_volume / soil_surface_area)
+    return df
+
+
 def write_output(df, output_directory, suffix):
     def write(group):
         fname = group.name
@@ -76,7 +81,6 @@ def write_output(df, output_directory, suffix):
 
 parser = argparse.ArgumentParser(
     description="Process data from Teledyne NOy analyser and FTIR",
-    epilog="example: fluxpro inp.csv 24 10 6 10 --buffer 2",
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
 )
 
@@ -85,6 +89,9 @@ parser.add_argument("cycles", type=int, help="total number of cycles")
 parser.add_argument("samples", type=int, help="number of samples per cycle (including the blank)")
 parser.add_argument("sample_time", type=int, help="number of minutes per sample")
 parser.add_argument("blank", type=int, help="index of the blank (counting up from 1)")
+parser.add_argument("flow", type=float, help="flow rate through the chamber (L/min)")
+parser.add_argument("chamber_volume", type=float, help="volume of the chamber headspace (m^3)")
+parser.add_argument("soil_surface_area", type=float, help="surface area of the soil (m^2)")
 parser.add_argument(
     "--buffer",
     "-b",
@@ -116,6 +123,9 @@ def print_header(args):
     print("Buffer minutes:", args.buffer)
     print("Output directory:", args.out)
     print("Header index:", args.header)
+    print("Flow:", args.flow)
+    print("Chamber volume:", args.chamber_volume)
+    print("Soil surface area:", args.soil_surface_area)
     print()
 
 
@@ -141,6 +151,8 @@ def main():
 
     print("Computing averages.")
     df = compute_averages(df)
+
+    df = calculate_flux(df, args.flow, args.chamber_volume, args.soil_surface_area)
 
     write_output(df, args.out, "avg")
     print(f"Results written to {GREEN}`{args.out}`{RESET}.")
