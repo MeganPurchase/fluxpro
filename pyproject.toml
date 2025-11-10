@@ -1,22 +1,31 @@
-[tool.poetry]
+[project]
 name = "fluxpro"
 version = "0.1.0"
+requires-python = ">=3.12"
 description = "Process data from Teledyne NOy analyser and FTIR"
-authors = [
-  "James Gardner <james.gardner1421@gmail.com>",
-  "Megan Purchase <megpurch2798@gmail.com>",
-]
 readme = "README.md"
-repository = "https://github.com/MeganPurchase/fluxpro"
+authors = [
+  { name = "James Gardner", email = "james.gardner1421@gmail.com" },
+  { name = "Megan Purchase", email = "megpurch2798@gmail.com" }
+]
+dependencies = [
+  "pandas>=2.3.3",
+  "numpy>=2.3.4",
+]
 
-[tool.poetry.dependencies]
-python = "^3.8"
-pandas = "^2.2.2"
-numpy = "^1.26.4"
+[project.urls]
+Repository = "https://github.com/MeganPurchase/fluxpro"
 
-[tool.poetry.scripts]
+[project.scripts]
 fluxpro = "fluxpro.main:main"
 
+[tool.uv]
+dev-dependencies = [
+  "ruff>=0.14.4",
+  "pytest>=9.0.0"
+]
+
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["uv_build>=0.9.8,<0.10.0"]
+build-backend = "uv_build"
+
