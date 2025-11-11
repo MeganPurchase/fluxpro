@@ -24,13 +24,54 @@ def assign_row_labels(df, cycles, sample_time, samples):
     return df
 
 
+def assign_row_labels_by_time(
+    df: pd.DataFrame, time_col: str, cycles: int, sample_time: float, samples: int
+):
+    """
+    Assigns 'cycle' and 'sample' labels to rows based on a datetime column.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame containing a datetime column.
+    time_col : str
+        Name of the datetime column.
+    cycles : int
+        Number of cycles.
+    sample_time : float
+        Duration of each sample interval, in minutes.
+    samples : int
+        Number of samples per cycle.
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with added 'cycle' and 'sample' columns.
+    """
+    df[time_col] = pd.to_datetime(df[time_col])
+
+    # Calculate elapsed time in minutes from the first timestamp
+    elapsed = (df[time_col] - df[time_col].iloc[0]).dt.total_seconds() / 60.0
+
+    cycle_duration = sample_time * samples
+
+    df["cycle"] = np.floor(elapsed / cycle_duration).astype(int) + 1
+    df["sample"] = np.floor((elapsed % cycle_duration) / sample_time).astype(int) + 1
+
+    # Clip to limits in case the last few rows slightly exceed expected range
+    df["cycle"] = df["cycle"].clip(upper=cycles)
+    df["sample"] = df["sample"].clip(upper=samples)
+
+    return df
+
+
 def remove_transition_minutes(df, sample_time, buffer):
     gdf = df.groupby(["sample", "cycle"])
     return gdf.tail(sample_time - buffer)
 
 
 def filter_relevant_columns(df):
-    regex = r"(cycle|sample|ppm \(cal\)|Conc)"
+    regex = r"(cycle|sample|ppm \(cal\)|Conc|NO2 \(ppb\)|HONO \(ppb\)|CO2 \(ppm\))"
     return df.filter(regex=regex)
 
 
@@ -38,11 +79,11 @@ def reformat_data(df):
     return df.melt(id_vars=["cycle", "sample"], var_name="gas")
 
 
-def subtract_blank(df, blank):
+def subtract_blank(df, blank_index: int):
     gdf = df.groupby("sample")
-    non_blanks = gdf.filter(lambda x: x.name != blank).reset_index()
+    non_blanks = gdf.filter(lambda x: x.name != blank_index).reset_index()
 
-    blank = gdf.filter(lambda x: x.name == blank).reset_index()
+    blank = gdf.filter(lambda x: x.name == blank_index).reset_index()
     blank.drop(columns=["sample"], inplace=True)
     blank = blank.groupby(["cycle", "gas"]).agg(mean_blank=("value", "mean")).reset_index()
 
@@ -69,6 +110,10 @@ def write_output(df, output_directory, suffix):
         if "ppm (cal)" in group.name:
             fname = group.name.split(" / ")[0].replace(" ", "_").lower()
         elif "Conc" in group.name:
+            fname = group.name.strip().split(" ")[0].lower()
+        elif "(ppb)" in group.name:
+            fname = group.name.strip().split(" ")[0].lower()
+        elif "(ppm)" in group.name:
             fname = group.name.strip().split(" ")[0].lower()
 
         group = group.reset_index()
@@ -129,15 +174,11 @@ def print_header(args):
     print()
 
 
-def main():
-    args = parser.parse_args()
-
-    print_header(args)
-
+def run(args):
     print(f"Reading data from {GREEN}`{args.input_file}`{RESET}.")
-    df = pd.read_csv(args.input_file, header=args.header)
+    df = pd.read_csv(args.input_file, header=args.header, sep=None, engine="python")
 
-    df = assign_row_labels(df, args.cycles, args.sample_time, args.samples)
+    df = assign_row_labels_by_time(df, df.columns[0], args.cycles, args.sample_time, args.samples)
 
     df = remove_transition_minutes(df, args.sample_time, args.buffer)
     print(f"Deleted {args.buffer} minutes from the beginning of each sample.")
@@ -156,6 +197,13 @@ def main():
 
     write_output(df, args.out, "avg")
     print(f"Results written to {GREEN}`{args.out}`{RESET}.")
+
+
+def main():
+    args = parser.parse_args()
+
+    print_header(args)
+    run(args)
 
 
 if __name__ == "__main__":
