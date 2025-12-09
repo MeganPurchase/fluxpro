@@ -9,8 +9,8 @@ authors = [
   { name = "Megan Purchase", email = "megpurch2798@gmail.com" }
 ]
 dependencies = [
-  "pandas>=2.3.3",
   "numpy>=2.3.4",
+  "polars>=1.35.2",
 ]
 
 [project.urls]
@@ -29,3 +29,7 @@ dev = [
 requires = ["uv_build>=0.9.8,<0.10.0"]
 build-backend = "uv_build"
 
+[tool.pyright]
+venvPath='.'
+venv=".venv"
+exclude=['.venv']

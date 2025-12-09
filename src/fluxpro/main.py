@@ -1,8 +1,10 @@
 import argparse
-import numpy as np
-import pandas as pd
 import sys
 from pathlib import Path
+from typing import Tuple
+
+import polars as pl
+import polars.selectors as cs
 
 GREEN = "\033[32m"
 RESET = "\033[0m"
@@ -15,195 +17,237 @@ ASCII_ART = """\
 """
 
 
-def assign_row_labels(df, cycles, sample_time, samples):
-    minutes_per_cycle = sample_time * samples
-    df["cycle"] = np.repeat(np.arange(1, cycles + 1), minutes_per_cycle)
-    df["sample"] = np.tile(
-        np.array([np.full(sample_time, i) for i in range(1, samples + 1)]).flatten(), cycles
-    )
-    return df
-
-
-def assign_row_labels_by_time(
-    df: pd.DataFrame, time_col: str, cycles: int, sample_time: float, samples: int
-):
+def label_rows_by_time(
+    lf: pl.LazyFrame, cycles: int, sample_time: float, samples: int
+) -> pl.LazyFrame:
     """
-    Assigns 'cycle' and 'sample' labels to rows based on a datetime column.
-
-    Parameters
-    ----------
-    df : pd.DataFrame
-        DataFrame containing a datetime column.
-    time_col : str
-        Name of the datetime column.
-    cycles : int
-        Number of cycles.
-    sample_time : float
-        Duration of each sample interval, in minutes.
-    samples : int
-        Number of samples per cycle.
-
-    Returns
-    -------
-    pd.DataFrame
-        DataFrame with added 'cycle' and 'sample' columns.
+    Assign cycle and sample numbers using timestamp information.
     """
-    df[time_col] = pd.to_datetime(df[time_col])
-
-    # Calculate elapsed time in minutes from the first timestamp
-    elapsed = (df[time_col] - df[time_col].iloc[0]).dt.total_seconds() / 60.0
-
     cycle_duration = sample_time * samples
+    time_col = lf.collect_schema().names()[0]
 
-    df["cycle"] = np.floor(elapsed / cycle_duration).astype(int) + 1
-    df["sample"] = np.floor((elapsed % cycle_duration) / sample_time).astype(int) + 1
-
-    # Clip to limits in case the last few rows slightly exceed expected range
-    df["cycle"] = df["cycle"].clip(upper=cycles)
-    df["sample"] = df["sample"].clip(upper=samples)
-
-    return df
-
-
-def remove_transition_minutes(df, sample_time, buffer):
-    gdf = df.groupby(["sample", "cycle"])
-    return gdf.tail(sample_time - buffer)
-
-
-def filter_relevant_columns(df):
-    regex = r"(cycle|sample|ppm \(cal\)|Conc|NO2 \(ppb\)|HONO \(ppb\)|CO2 \(ppm\))"
-    return df.filter(regex=regex)
-
-
-def reformat_data(df):
-    return df.melt(id_vars=["cycle", "sample"], var_name="gas")
-
-
-def subtract_blank(df, blank_index: int):
-    gdf = df.groupby("sample")
-    non_blanks = gdf.filter(lambda x: x.name != blank_index).reset_index()
-
-    blank = gdf.filter(lambda x: x.name == blank_index).reset_index()
-    blank.drop(columns=["sample"], inplace=True)
-    blank = blank.groupby(["cycle", "gas"]).agg(mean_blank=("value", "mean")).reset_index()
-
-    df = non_blanks.merge(blank, how="left", on=["cycle", "gas"], suffixes=("", "_blank"))
-    df["value_reduced"] = df["value"] - df["mean_blank"]
-
-    return df.drop(columns=["index"])
-
-
-def compute_averages(df):
-    return df.groupby(["sample", "cycle", "gas"]).agg(
-        mean=("value_reduced", "mean"), std=("value_reduced", "std"), sem=("value_reduced", "sem")
+    return (
+        lf.with_columns(pl.col(time_col).str.strptime(pl.Datetime))
+        .with_columns(
+            elapsed=((pl.col(time_col) - pl.col(time_col).first()).dt.total_seconds() / 60.0)
+        )
+        .with_columns(
+            cycle=((pl.col("elapsed") / cycle_duration).floor().cast(pl.Int64) + 1).clip(
+                upper_bound=cycles
+            ),
+            sample=(
+                ((pl.col("elapsed") % cycle_duration) / sample_time).floor().cast(pl.Int64) + 1
+            ).clip(upper_bound=samples),
+        )
     )
 
 
-def calculate_flux(df, flow, chamber_volume, soil_surface_area):
-    df["flux"] = df["mean"] * flow * (chamber_volume / soil_surface_area)
-    return df
+def remove_transition_minutes(lf: pl.LazyFrame, sample_time: int, buffer: int) -> pl.LazyFrame:
+    """
+    Remove the first `buffer` minutes from each (cycle, sample) group.
+    """
+    keep_n = sample_time - buffer
+
+    return lf.sort(["cycle", "sample"]).group_by(["cycle", "sample"]).tail(keep_n)
 
 
-def write_output(df, output_directory, suffix):
-    def write(group):
-        fname = group.name
-        if "ppm (cal)" in group.name:
-            fname = group.name.split(" / ")[0].replace(" ", "_").lower()
-        elif "Conc" in group.name:
-            fname = group.name.strip().split(" ")[0].lower()
-        elif "(ppb)" in group.name:
-            fname = group.name.strip().split(" ")[0].lower()
-        elif "(ppm)" in group.name:
-            fname = group.name.strip().split(" ")[0].lower()
+def filter_relevant_columns(lf: pl.LazyFrame) -> pl.LazyFrame:
+    """
+    Filter columns matching relevant gas names or metadata.
+    """
+    regex = r"(cycle|sample|ppm \(cal\)|Conc|NO2 \(ppb\)|HONO \(ppb\)|CO2 \(ppm\))"
 
-        group = group.reset_index()
-        group.drop(columns="gas", inplace=True)
-        group.to_csv(output_directory / f"{fname}_{suffix}.csv", index=False)
+    return lf.select(cs.matches(regex))
 
+
+def unpivot(lf: pl.LazyFrame) -> pl.LazyFrame:
+    return lf.unpivot(index=["cycle", "sample"], variable_name="gas", value_name="value")
+
+
+def subtract_blank(lf: pl.LazyFrame, blank_index: int) -> pl.LazyFrame:
+    """
+    Subtract blank sample means from all other samples.
+    """
+    blank_means = (
+        lf.filter(pl.col("sample") == blank_index)
+        .drop("sample")
+        .group_by(["cycle", "gas"])
+        .agg(mean_blank=pl.mean("value"))
+    )
+
+    return (
+        lf.filter(pl.col("sample") != blank_index)
+        .join(blank_means, on=["cycle", "gas"], how="left")
+        .with_columns(value_reduced=pl.col("value") - pl.col("mean_blank"))
+    )
+
+
+def compute_statistics(lf: pl.LazyFrame) -> pl.LazyFrame:
+    """
+    Compute mean/std/sem for each gas × cycle × sample.
+    """
+    return lf.group_by(["sample", "cycle", "gas"]).agg(
+        mean=pl.mean("value_reduced"),
+        std=pl.std("value_reduced"),
+        sem=pl.std("value_reduced") / pl.len().sqrt(),
+    )
+
+
+def compute_flux(
+    lf: pl.LazyFrame, flow: float, chamber_volume: float, soil_surface_area: float
+) -> pl.LazyFrame:
+    """
+    Compute flux from reduced values.
+    """
+    factor = chamber_volume / soil_surface_area
+    return lf.with_columns(flux=pl.col("mean") * flow * factor)
+
+
+def sanitize_gas_name(name: str) -> str:
+    """
+    Convert gas name into a file-safe lowercase value.
+    """
+    if "ppm (cal)" in name:
+        return name.split(" / ")[0].replace(" ", "_").lower()
+    if "Conc" in name or "(ppb)" in name or "(ppm)" in name:
+        return name.split()[0].lower()
+    return name.replace(" ", "_").lower()
+
+
+def write_output(df: pl.DataFrame, output_directory: Path, suffix: str) -> None:
+    """
+    Write each gas into its own CSV, based on sanitized gas names.
+    """
     output_directory.mkdir(exist_ok=True)
-    df.groupby("gas").apply(write)
+
+    for gas_value, gdf in df.group_by("gas"):
+        fname: str = sanitize_gas_name(gas_value[0])
+        print(gas_value)
+        print(fname)
+        gdf = gdf.drop("gas")
+        gdf.write_csv(output_directory / f"{fname}_{suffix}.csv")
 
 
-parser = argparse.ArgumentParser(
-    description="Process data from Teledyne NOy analyser and FTIR",
-    formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-)
+def process_file(
+    input_file: str,
+    cycles: int,
+    samples: int,
+    sample_time: int,
+    blank: int,
+    flow: float,
+    chamber_volume: float,
+    soil_surface_area: float,
+    buffer: int,
+    outdir: Path,
+    header: int,
+) -> Tuple[pl.DataFrame, pl.DataFrame]:
+    """
+    Execute the entire data-processing pipeline in lazy mode.
+    """
 
-parser.add_argument("input_file", type=str, help=".csv file containing the gas flux data")
-parser.add_argument("cycles", type=int, help="total number of cycles")
-parser.add_argument("samples", type=int, help="number of samples per cycle (including the blank)")
-parser.add_argument("sample_time", type=int, help="number of minutes per sample")
-parser.add_argument("blank", type=int, help="index of the blank (counting up from 1)")
-parser.add_argument("flow", type=float, help="flow rate through the chamber (L/min)")
-parser.add_argument("chamber_volume", type=float, help="volume of the chamber headspace (m^3)")
-parser.add_argument("soil_surface_area", type=float, help="surface area of the soil (m^2)")
-parser.add_argument(
-    "--buffer",
-    "-b",
-    type=int,
-    default=2,
-    help="number of minutes at the start of each sample that are removed from the analysis to allow the readings to settle",
-)
-parser.add_argument(
-    "--out",
-    "-o",
-    type=Path,
-    default="output",
-    help="name of output directory",
-)
-parser.add_argument(
-    "--header",
-    type=int,
-    default=0,
-    help="line number of the header",
-)
+    separator = ","
+    if input_file.endswith("dat"):
+        separator = "\t"
+
+    lf = pl.scan_csv(
+        input_file, has_header=True, skip_rows=header, infer_schema_length=1000, separator=separator
+    )
+    time_col = lf.collect_schema().names()[0]
+
+    lf_all = (
+        lf.pipe(label_rows_by_time, cycles, sample_time, samples)
+        .pipe(remove_transition_minutes, sample_time, buffer)
+        .pipe(filter_relevant_columns)
+        .pipe(unpivot)
+        .pipe(subtract_blank, blank)
+    )
+
+    df_all = lf_all.collect()
+    write_output(df_all, outdir, "all")
+
+    lf_avg = lf_all.pipe(compute_statistics).pipe(
+        compute_flux, flow, chamber_volume, soil_surface_area
+    )
+
+    df_avg = lf_avg.collect()
+    write_output(df_avg, outdir, "avg")
+
+    return df_all, df_avg
 
 
-def print_header(args):
+def validate_input(input_file: str, header: int) -> None:
+    """
+    Primitive validation to detect early empty lines.
+    """
+    with open(input_file) as f:
+        for i, line in enumerate(f):
+            print(repr(line))
+            if i > 10:
+                raise ValueError(f"empty line at line {i}")
+
+
+def print_header(args: argparse.Namespace) -> None:
     print(f"{GREEN}{ASCII_ART}{RESET}")
-    print("Cycles:", args.cycles)
-    print("Samples:", args.samples)
-    print("Sample time:", args.sample_time)
-    print("Blank index:", args.blank)
-    print("Buffer minutes:", args.buffer)
-    print("Output directory:", args.out)
-    print("Header index:", args.header)
-    print("Flow:", args.flow)
-    print("Chamber volume:", args.chamber_volume)
-    print("Soil surface area:", args.soil_surface_area)
+    for key, value in vars(args).items():
+        print(f"{key}: {value}")
     print()
 
 
-def run(args):
-    print(f"Reading data from {GREEN}`{args.input_file}`{RESET}.")
-    df = pd.read_csv(args.input_file, header=args.header, sep=None, engine="python")
-
-    df = assign_row_labels_by_time(df, df.columns[0], args.cycles, args.sample_time, args.samples)
-
-    df = remove_transition_minutes(df, args.sample_time, args.buffer)
-    print(f"Deleted {args.buffer} minutes from the beginning of each sample.")
-
-    df = filter_relevant_columns(df)
-    df = reformat_data(df)
-
-    print("Subtracting the blank.")
-    df = subtract_blank(df, args.blank)
-    write_output(df.set_index(["sample", "cycle", "gas"]), args.out, "all")
-
-    print("Computing averages.")
-    df = compute_averages(df)
-
-    df = calculate_flux(df, args.flow, args.chamber_volume, args.soil_surface_area)
-
-    write_output(df, args.out, "avg")
-    print(f"Results written to {GREEN}`{args.out}`{RESET}.")
-
-
 def main():
-    args = parser.parse_args()
+    parser = argparse.ArgumentParser(
+        description="Process data from Teledyne NOy analyser and FTIR",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
 
+    parser.add_argument("input_file", type=str, help=".csv file containing the gas flux data")
+    parser.add_argument("cycles", type=int, help="total number of cycles")
+    parser.add_argument(
+        "samples", type=int, help="number of samples per cycle (including the blank)"
+    )
+    parser.add_argument("sample_time", type=int, help="number of minutes per sample")
+    parser.add_argument("blank", type=int, help="index of the blank (counting up from 1)")
+    parser.add_argument("flow", type=float, help="flow rate through the chamber (L/min)")
+    parser.add_argument("chamber_volume", type=float, help="volume of the chamber headspace (m^3)")
+    parser.add_argument("soil_surface_area", type=float, help="surface area of the soil (m^2)")
+    parser.add_argument(
+        "--buffer",
+        "-b",
+        type=int,
+        default=2,
+        help="number of minutes at the start of each sample that are removed from the analysis to allow the readings to settle",
+    )
+    parser.add_argument(
+        "--out",
+        "-o",
+        type=Path,
+        default="output",
+        help="name of output directory",
+    )
+    parser.add_argument(
+        "--header",
+        type=int,
+        default=0,
+        help="line number of the header",
+    )
+
+    args = parser.parse_args()
     print_header(args)
-    run(args)
+
+    validate_input(args.input_file, args.header)
+
+    process_file(
+        input_file=args.input_file,
+        cycles=args.cycles,
+        samples=args.samples,
+        sample_time=args.sample_time,
+        blank=args.blank,
+        flow=args.flow,
+        chamber_volume=args.chamber_volume,
+        soil_surface_area=args.soil_surface_area,
+        buffer=args.buffer,
+        outdir=args.out,
+        header=args.header,
+    )
 
 
 if __name__ == "__main__":
