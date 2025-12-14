@@ -1,11 +1,18 @@
-from typing import Tuple
 import dateutil.parser
 from pathlib import Path
+from datetime import timedelta
 
+from fluxpro.data_standardizer import DataStandardizer
 import polars as pl
-import polars.selectors as cs
 
 from .config import Config
+
+
+def detect_separator(input_file: Path) -> str:
+    if input_file.suffix == ".dat":
+        return "\t"
+    else:
+        return ","
 
 
 def detect_header_row(input_file: Path, separator: str) -> int:
@@ -24,16 +31,11 @@ def detect_header_row(input_file: Path, separator: str) -> int:
 def label_rows_by_time(
     lf: pl.LazyFrame, cycles: int, sample_time: float, samples: int
 ) -> pl.LazyFrame:
-    """
-    Assign cycle and sample numbers using timestamp information.
-    """
     cycle_duration = sample_time * samples
-    time_col = lf.collect_schema().names()[0]
 
     return (
-        lf.with_columns(pl.col(time_col).str.strptime(pl.Datetime))
-        .with_columns(
-            elapsed=((pl.col(time_col) - pl.col(time_col).first()).dt.total_seconds() / 60.0)
+        lf.with_columns(
+            elapsed=((pl.col("datetime") - pl.col("datetime").first()).dt.total_minutes())
         )
         .with_columns(
             cycle=((pl.col("elapsed") / cycle_duration).floor().cast(pl.Int64) + 1).clip(
@@ -43,100 +45,126 @@ def label_rows_by_time(
                 ((pl.col("elapsed") % cycle_duration) / sample_time).floor().cast(pl.Int64) + 1
             ).clip(upper_bound=samples),
         )
+        .drop("elapsed")
     )
 
 
-def remove_transition_minutes(lf: pl.LazyFrame, sample_time: int, buffer: int) -> pl.LazyFrame:
-    """
-    Remove the first `buffer` minutes from each (cycle, sample) group.
-    """
-    keep_n = sample_time - buffer
+def remove_transition_minutes(lf: pl.LazyFrame, buffer: int) -> pl.LazyFrame:
+    start_times = pl.col("datetime").min().over(["cycle", "sample"])
 
-    return lf.sort(["cycle", "sample"]).group_by(["cycle", "sample"]).tail(keep_n)
-
-
-def filter_relevant_columns(lf: pl.LazyFrame) -> pl.LazyFrame:
-    """
-    Filter columns matching relevant gas names or metadata.
-    """
-    regex = r"(cycle|sample|ppm \(cal\)|Conc|NO2 \(ppb\)|HONO \(ppb\)|CO2 \(ppm\))"
-
-    return lf.select(cs.matches(regex))
+    return lf.sort(["cycle", "sample", "datetime"]).filter(
+        pl.col("datetime") >= (start_times + timedelta(minutes=buffer))
+    )
 
 
 def unpivot(lf: pl.LazyFrame) -> pl.LazyFrame:
-    return lf.unpivot(index=["cycle", "sample"], variable_name="gas", value_name="value")
+    return lf.unpivot(
+        index=["cycle", "sample", "datetime"], variable_name="gas", value_name="concentration"
+    )
 
 
 def subtract_blank(lf: pl.LazyFrame, blank_index: int) -> pl.LazyFrame:
-    """
-    Subtract blank sample means from all other samples.
-    """
-    blank_means = (
+    blank_avg = (
         lf.filter(pl.col("sample") == blank_index)
         .drop("sample")
         .group_by(["cycle", "gas"])
-        .agg(mean_blank=pl.mean("value"))
+        .agg(flux_blank_avg=pl.mean("flux"))
     )
 
     return (
         lf.filter(pl.col("sample") != blank_index)
-        .join(blank_means, on=["cycle", "gas"], how="left")
-        .with_columns(value_reduced=pl.col("value") - pl.col("mean_blank"))
+        .join(blank_avg, on=["cycle", "gas"], how="left")
+        .with_columns(flux_corrected=pl.col("flux") - pl.col("flux_blank_avg"))
     )
 
 
 def compute_statistics(lf: pl.LazyFrame) -> pl.LazyFrame:
-    """
-    Compute mean/std/sem for each gas × cycle × sample.
-    """
-    return lf.group_by(["sample", "cycle", "gas"]).agg(
-        mean=pl.mean("value_reduced"),
-        std=pl.std("value_reduced"),
-        sem=pl.std("value_reduced") / pl.len().sqrt(),
+    return lf.with_columns(
+        flux_corrected_avg=pl.mean("flux_corrected").over(["sample", "cycle", "gas"]),
+        flux_corrected_std=pl.std("flux_corrected").over(["sample", "cycle", "gas"]),
+        flux_corrected_sem=(
+            pl.std("flux_corrected").over(["sample", "cycle", "gas"])
+            / pl.len().over(["sample", "cycle", "gas"]).sqrt()
+        ),
     )
 
 
 def compute_flux(
     lf: pl.LazyFrame, flow: float, chamber_volume: float, soil_surface_area: float
 ) -> pl.LazyFrame:
-    """
-    Compute flux from reduced values.
-    """
-    factor = chamber_volume / soil_surface_area
-    return lf.with_columns(flux=pl.col("mean") * flow * factor)
+
+    molar_masses = pl.LazyFrame(
+        {
+            "gas": ["NH3", "NO2", "N2O", "O3", "HONO", "NO", "NOY", "NOY-NO", "CO", "CO2", "CH4"],
+            # g/mol
+            "molar_mass": [
+                17.031,
+                46.0055,
+                44.0128,
+                48.00,
+                47.013,
+                30.006,
+                1.0,  # placeholder
+                1.0,  # placeholder
+                28.01,
+                44.01,
+                16.043,
+            ],
+        }
+    )
+    nano = 1e9
+
+    # see https://amt.copernicus.org/articles/15/2807/2022/ for equation
+    # conc  * flow  / soil_surface_area * molar_mass * nano
+    # mol/L * L/min / m^2               * g/mol      * n
+    # concentration has units of mol/L from DataStandardizer
+    # flux returned in units of ng/m^2/min
+    return (
+        lf.join(molar_masses, on="gas")
+        .with_columns(
+            flux=pl.col("concentration") * flow / soil_surface_area * pl.col("molar_mass") * nano
+        )
+        .drop("concentration", "molar_mass")
+    )
 
 
-def sanitize_gas_name(name: str) -> str:
-    """
-    Convert gas name into a file-safe lowercase value.
-    """
-    if "ppm (cal)" in name:
-        return name.split(" / ")[0].replace(" ", "_").lower()
-    if "Conc" in name or "(ppb)" in name or "(ppm)" in name:
-        return name.split()[0].lower()
-    return name.replace(" ", "_").lower()
+def reformat_for_output(lf: pl.LazyFrame) -> pl.DataFrame:
+    return (
+        lf.unpivot(
+            index=["cycle", "sample", "datetime", "gas"],
+            variable_name="metric",
+            value_name="value",
+        )
+        .with_columns((pl.col("gas") + "_" + pl.col("metric")).alias("column_name"))
+        .collect()
+        .pivot(
+            index=["cycle", "sample", "datetime"],
+            on="column_name",
+            values="value",
+            aggregate_function="first",
+        )
+        .sort("cycle", "sample", "datetime")
+    )
 
 
-def write_output(df: pl.DataFrame, output_directory: Path, suffix: str) -> None:
-    """
-    Write each gas into its own CSV, based on sanitized gas names.
-    """
-    for gas_value, gdf in df.group_by("gas"):
-        fname: str = sanitize_gas_name(gas_value[0])
-        gdf = gdf.drop("gas")
-        gdf.write_csv(output_directory / f"{fname}_{suffix}.csv")
+def print_lf(lf: pl.LazyFrame):
+    pl.Config.set_tbl_width_chars(10000)  # 0 = no truncation for columns
+    pl.Config.set_tbl_rows(10000)  # 0 = show all rows
+    print(lf.collect().head(500))
+    return lf
 
 
-def process_file(input_file: Path, config: Config) -> Tuple[pl.DataFrame, pl.DataFrame]:
-    """
-    Execute the entire data-processing pipeline in lazy mode.
-    """
+def print_df(df: pl.DataFrame):
+    pl.Config.set_tbl_width_chars(10000)  # 0 = no truncation for columns
+    pl.Config.set_tbl_rows(10000)  # 0 = show all rows
+    print(df.head(500))
+    print(df.columns)
+    return df
 
-    separator = ","
-    if input_file.as_posix().endswith("dat"):
-        separator = "\t"
 
+def process_file(input_file: Path, config: Config):
+
+    separator = detect_separator(input_file)
     skip_rows = detect_header_row(input_file, separator)
 
     lf = pl.scan_csv(
@@ -147,7 +175,10 @@ def process_file(input_file: Path, config: Config) -> Tuple[pl.DataFrame, pl.Dat
         separator=separator,
     )
 
-    lf_all = (
+    standardizer = DataStandardizer()
+    lf = standardizer.run(lf)
+
+    df = (
         lf.pipe(
             label_rows_by_time,
             config.samples.total_cycles,
@@ -156,25 +187,21 @@ def process_file(input_file: Path, config: Config) -> Tuple[pl.DataFrame, pl.Dat
         )
         .pipe(
             remove_transition_minutes,
-            config.samples.minutes_per_sample,
             config.samples.discard_minutes,
         )
-        .pipe(filter_relevant_columns)
         .pipe(unpivot)
+        .pipe(
+            compute_flux,
+            config.flux.flow_rate,
+            config.flux.chamber_volume,
+            config.flux.soil_surface_area,
+        )
         .pipe(subtract_blank, config.samples.blank_sample_index)
+        .pipe(compute_statistics)
+        # .pipe(print_lf)
+        .pipe(reformat_for_output)
+        # .pipe(print_df)
     )
 
-    df_all = lf_all.collect()
-    write_output(df_all, input_file.parent, "all")
-
-    lf_avg = lf_all.pipe(compute_statistics).pipe(
-        compute_flux,
-        config.flux.flow_rate,
-        config.flux.chamber_volume,
-        config.flux.soil_surface_area,
-    )
-
-    df_avg = lf_avg.collect()
-    write_output(df_avg, input_file.parent, "avg")
-
-    return df_all, df_avg
+    output_file = input_file.with_name(f"{input_file.stem}_out.csv")
+    df.write_csv(output_file)

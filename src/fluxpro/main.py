@@ -2,8 +2,11 @@ import argparse
 import sys
 from pathlib import Path
 
+import polars as pl
+
 from .config import Config
 from . import process
+from . import plot
 
 
 GREEN = "\033[32m"
@@ -24,7 +27,7 @@ def print_header() -> None:
     print()
 
 
-def main():
+def get_parser(default_config_path: str) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Process data from Teledyne NOy analyser and FTIR",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -34,14 +37,23 @@ def main():
 
     subparsers.add_parser("generate", help="generate an example config file")
 
-    default_config_path = "config.toml"
-
     run = subparsers.add_parser("run")
     run.add_argument("input_file", type=Path, help="path to the input file")
     run.add_argument(
         "-c", "--config", type=Path, default=default_config_path, help="path to the config file"
     )
 
+    plot = subparsers.add_parser("plot")
+    plot.add_argument("output_file", type=Path, help="path to the file produced by fluxpro")
+
+    return parser
+
+
+def main():
+
+    default_config_path = "config.toml"
+
+    parser = get_parser(default_config_path)
     args = parser.parse_args()
 
     print_header()
@@ -56,6 +68,10 @@ def main():
         config = Config.from_toml(args.config)
 
         process.process_file(args.input_file, config)
+
+    elif args.command == "plot":
+        df = pl.read_csv(args.output_file)
+        plot.plot(df)
 
 
 if __name__ == "__main__":
