@@ -2,6 +2,7 @@ import dateutil.parser
 from pathlib import Path
 from datetime import timedelta
 
+from fluxpro.blank_handler import BlankHandler
 from fluxpro.data_standardizer import DataStandardizer
 import polars as pl
 
@@ -60,21 +61,6 @@ def remove_transition_minutes(lf: pl.LazyFrame, buffer: int) -> pl.LazyFrame:
 def unpivot(lf: pl.LazyFrame) -> pl.LazyFrame:
     return lf.unpivot(
         index=["cycle", "sample", "datetime"], variable_name="gas", value_name="concentration"
-    )
-
-
-def subtract_blank(lf: pl.LazyFrame, blank_index: int) -> pl.LazyFrame:
-    blank_avg = (
-        lf.filter(pl.col("sample") == blank_index)
-        .drop("sample")
-        .group_by(["cycle", "gas"])
-        .agg(flux_blank_avg=pl.mean("flux"))
-    )
-
-    return (
-        lf.filter(pl.col("sample") != blank_index)
-        .join(blank_avg, on=["cycle", "gas"], how="left")
-        .with_columns(flux_corrected=pl.col("flux") - pl.col("flux_blank_avg"))
     )
 
 
@@ -151,15 +137,15 @@ def reformat_for_output(lf: pl.LazyFrame) -> pl.DataFrame:
 
 
 def print_lf(lf: pl.LazyFrame):
-    pl.Config.set_tbl_width_chars(10000)  # 0 = no truncation for columns
-    pl.Config.set_tbl_rows(10000)  # 0 = show all rows
+    pl.Config.set_tbl_width_chars(10000)
+    pl.Config.set_tbl_rows(10000)
     print(lf.collect().head(500))
     return lf
 
 
 def print_df(df: pl.DataFrame):
-    pl.Config.set_tbl_width_chars(10000)  # 0 = no truncation for columns
-    pl.Config.set_tbl_rows(10000)  # 0 = show all rows
+    pl.Config.set_tbl_width_chars(10000)
+    pl.Config.set_tbl_rows(10000)
     print(df.head(500))
     print(df.columns)
     return df
@@ -179,10 +165,12 @@ def process_file(input_file: Path, config: Config):
     )
 
     standardizer = DataStandardizer()
-    lf = standardizer.run(lf)
+
+    blank_handler = BlankHandler.create_handler(config.blank)
 
     df = (
-        lf.pipe(
+        lf.pipe(standardizer.run)
+        .pipe(
             label_rows_by_time,
             config.samples.total_cycles,
             config.samples.minutes_per_sample,
@@ -199,11 +187,9 @@ def process_file(input_file: Path, config: Config):
             config.flux.chamber_volume,
             config.flux.soil_surface_area,
         )
-        .pipe(subtract_blank, config.samples.blank_sample_index)
+        .pipe(blank_handler.run)
         .pipe(compute_statistics)
-        # .pipe(print_lf)
         .pipe(reformat_for_output)
-        # .pipe(print_df)
     )
 
     output_file = input_file.with_name(f"{input_file.stem}_out.csv")

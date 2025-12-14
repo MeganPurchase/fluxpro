@@ -46,13 +46,16 @@ def test_pipeline_integration_1(data_dir: Path, tmp_path: Path, request):
             total_cycles=22,
             samples_per_cycle=6,
             minutes_per_sample=10,
-            blank_sample_index=1,
             discard_minutes=2,
         ),
         flux=Config.FluxConfig(
             flow_rate=1,
             chamber_volume=1,
             soil_surface_area=1,
+        ),
+        blank=Config.BlankConfig(
+            mode="sample",
+            index=1,
         ),
     )
 
@@ -72,13 +75,16 @@ def test_pipeline_integration_2(data_dir: Path, tmp_path: Path, request):
             total_cycles=21,
             samples_per_cycle=6,
             minutes_per_sample=10,
-            blank_sample_index=1,
             discard_minutes=2,
         ),
         flux=Config.FluxConfig(
             flow_rate=1,
             chamber_volume=1,
             soil_surface_area=1,
+        ),
+        blank=Config.BlankConfig(
+            mode="sample",
+            index=1,
         ),
     )
 
@@ -98,13 +104,16 @@ def test_pipeline_integration_3(data_dir: Path, tmp_path: Path, request):
             total_cycles=24,
             samples_per_cycle=2,
             minutes_per_sample=30,
-            blank_sample_index=1,
             discard_minutes=5,
         ),
         flux=Config.FluxConfig(
             flow_rate=1,
             chamber_volume=1,
             soil_surface_area=1,
+        ),
+        blank=Config.BlankConfig(
+            mode="cycle",
+            index=1,
         ),
     )
 
