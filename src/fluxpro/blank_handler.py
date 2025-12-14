@@ -25,7 +25,7 @@ class BlankHandler(ABC):
 
     @abstractmethod
     def _join_blank(self, lf: pl.LazyFrame) -> pl.LazyFrame:
-        pass
+        raise NotImplementedError  # pragma: no cover
 
     def _subtract_blank(self, lf: pl.LazyFrame) -> pl.LazyFrame:
         return lf.with_columns(flux_corrected=pl.col("flux") - pl.col("flux_blank_avg"))

@@ -1,0 +1,23 @@
+[samples]
+# total number of cycles
+total_cycles = 22
+# number of samples per cycle (including the blank)
+samples_per_cycle = 6
+# number of minutes per sample
+minutes_per_sample = 10
+# number of minutes at the start of each sample that are removed from the analysis to allow the readings to settle
+discard_minutes = 2
+
+[flux]
+# flow rate through the chamber (L/min)
+flow_rate = 0.1
+# volume of the chamber headspace (m^3)
+chamber_volume = 0.01
+# surface area of the soil (m^2)
+soil_surface_area = 0.05
+
+[blank]
+# specifies whether to use a sample or a cycle as the blank reading. Options: 'sample' or 'cycle'
+mode = 'sample'
+# index of the blank (counting up from 1)
+index = 1

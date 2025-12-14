@@ -136,21 +136,6 @@ def reformat_for_output(lf: pl.LazyFrame) -> pl.DataFrame:
     )
 
 
-def print_lf(lf: pl.LazyFrame):
-    pl.Config.set_tbl_width_chars(10000)
-    pl.Config.set_tbl_rows(10000)
-    print(lf.collect().head(500))
-    return lf
-
-
-def print_df(df: pl.DataFrame):
-    pl.Config.set_tbl_width_chars(10000)
-    pl.Config.set_tbl_rows(10000)
-    print(df.head(500))
-    print(df.columns)
-    return df
-
-
 def process_file(input_file: Path, config: Config):
 
     separator = detect_separator(input_file)

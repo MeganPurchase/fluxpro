@@ -73,8 +73,6 @@ class Config:
             for f in fields(config):
                 lines.append(f"# {f.metadata.get("doc")}")
                 example = f.metadata.get("example")
-                if isinstance(example, Path):
-                    example = example.as_posix()
                 lines.append(f"{f.name} = {repr(example)}")
             return "\n".join(lines)
 
