@@ -93,22 +93,25 @@ def compute_flux(
     lf: pl.LazyFrame, flow: float, chamber_volume: float, soil_surface_area: float
 ) -> pl.LazyFrame:
 
+    nitrogen_mass = 14.006747
+    carbon_mass = 12.0111
+    oxygen_mass = 15.99943
     molar_masses = pl.LazyFrame(
         {
             "gas": ["NH3", "NO2", "N2O", "O3", "HONO", "NO", "NOY", "NOY-NO", "CO", "CO2", "CH4"],
             # g/mol
             "molar_mass": [
-                17.031,
-                46.0055,
-                44.0128,
-                48.00,
-                47.013,
-                30.006,
-                1.0,  # placeholder
-                1.0,  # placeholder
-                28.01,
-                44.01,
-                16.043,
+                nitrogen_mass,
+                nitrogen_mass,
+                nitrogen_mass,
+                oxygen_mass,
+                nitrogen_mass,
+                nitrogen_mass,
+                nitrogen_mass,
+                nitrogen_mass,
+                carbon_mass,
+                carbon_mass,
+                carbon_mass,
             ],
         }
     )
