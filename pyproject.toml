@@ -9,6 +9,7 @@ authors = [
   { name = "Megan Purchase", email = "megpurch2798@gmail.com" }
 ]
 dependencies = [
+  "click>=8.3.1",
   "matplotlib>=3.10.8",
   "numpy>=2.3.4",
   "polars>=1.35.2",
@@ -18,7 +19,7 @@ dependencies = [
 Repository = "https://github.com/MeganPurchase/fluxpro"
 
 [project.scripts]
-fluxpro = "fluxpro.main:main"
+fluxpro = "fluxpro.cli:cli"
 
 [dependency-groups]
 dev = [

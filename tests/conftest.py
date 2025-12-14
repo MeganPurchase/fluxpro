@@ -11,4 +11,4 @@ def pytest_addoption(parser):
 
 @pytest.fixture
 def data_dir() -> Path:
-    return Path("tests/test-data")
+    return Path(__file__).parent.resolve() / "test-data"
