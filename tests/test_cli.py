@@ -38,6 +38,7 @@ def test_run_must_succeed(monkeypatch, tmp_path: Path, data_dir: Path):
         ],
     )
     assert result.exit_code == 0
-    output_file = data_dir / "FTIR_0304_out.csv"
-    assert output_file.exists()
-    os.remove(output_file)
+    for i in range(2, 7):
+        output_file = data_dir / f"FTIR_0304_{i}_out.csv"
+        assert output_file.exists()
+        os.remove(output_file)

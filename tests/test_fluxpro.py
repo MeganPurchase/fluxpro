@@ -32,9 +32,18 @@ def run_integration_case(
 
     update = request.config.getoption("--update")
 
-    actual = tmp_path / f"{input_file.stem}_out.csv"
-    expected = expected_dir / f"{input_file.stem}_out.csv"
-    assert_csv_equal_or_update(actual, expected, update=update)
+    sample_numbers = []
+    if config.blank.mode == "sample":
+        sample_numbers = [
+            i for i in range(1, config.samples.samples_per_cycle + 1) if i != config.blank.index
+        ]
+    elif config.blank.mode == "cycle":
+        sample_numbers = [i for i in range(1, config.samples.samples_per_cycle + 1)]
+
+    for i in sample_numbers:
+        actual = tmp_path / f"{input_file.stem}_{i}_out.csv"
+        expected = expected_dir / f"{input_file.stem}_{i}_out.csv"
+        assert_csv_equal_or_update(actual, expected, update=update)
 
 
 def test_pipeline_integration_1(data_dir: Path, tmp_path: Path, request):

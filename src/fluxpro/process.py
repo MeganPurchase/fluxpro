@@ -177,5 +177,6 @@ def process_file(input_file: Path, config: Config):
         .pipe(reformat_for_output)
     )
 
-    output_file = input_file.with_name(f"{input_file.stem}_out.csv")
-    df.write_csv(output_file)
+    for sample, df_sample in df.partition_by("sample", as_dict=True).items():
+        output_file = input_file.with_name(f"{input_file.stem}_{sample[0]}_out.csv")
+        df_sample.write_csv(output_file)
