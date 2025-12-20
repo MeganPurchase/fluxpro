@@ -9,6 +9,7 @@ authors = [
   { name = "Megan Purchase", email = "megpurch2798@gmail.com" }
 ]
 dependencies = [
+  "altair>=6.0.0",
   "click>=8.3.1",
   "matplotlib>=3.10.8",
   "numpy>=2.3.4",
