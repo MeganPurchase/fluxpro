@@ -1,4 +1,5 @@
 import polars as pl
+import datetime
 
 
 class DataStandardizer:
@@ -29,9 +30,23 @@ class DataStandardizer:
         )
 
     def _standardize_datetime(self, lf: pl.LazyFrame) -> pl.LazyFrame:
-        return lf.rename({lf.collect_schema().names()[0]: self.COL_DATETIME}).with_columns(
-            pl.col(self.COL_DATETIME).str.strptime(pl.Datetime)
-        )
+        possible_formats = ["%d/%m/%Y %H:%M", "%m/%d/%Y %H:%M", "%Y-%m-%d %H:%M:%S"]
+
+        mapping = {lf.collect_schema().names()[0]: self.COL_DATETIME}
+        lf = lf.rename(mapping)
+
+        for format in possible_formats:
+            try:
+                lf_with_time = lf.with_columns(pl.col(self.COL_DATETIME).str.to_datetime(format))
+                lf_diff = lf_with_time.select(
+                    diff=pl.col(self.COL_DATETIME).diff(null_behavior="drop")
+                )
+                range = lf_diff.select(pl.col("diff").max() - pl.col("diff").min()).collect().item()
+                if range < datetime.timedelta(hours=1):
+                    return lf_with_time
+            except pl.exceptions.InvalidOperationError:
+                continue
+        raise ValueError("unexpected datetime format")
 
     def _select_input_columns(self, lf: pl.LazyFrame) -> pl.LazyFrame:
         names = [

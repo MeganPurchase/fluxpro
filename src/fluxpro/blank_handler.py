@@ -2,23 +2,20 @@ from __future__ import annotations
 
 import polars as pl
 from abc import ABC, abstractmethod
-from typing import override
-
-from .config import Config
+from typing import override, Literal
 
 
 class BlankHandler(ABC):
 
-    def __init__(self, config: Config.BlankConfig):
-        self.index = config.index
+    def __init__(self, index: int):
+        self.index = index
 
     @staticmethod
-    def create_handler(config: Config.BlankConfig) -> BlankHandler:
-        if config.mode == "sample":
-            return SampleBlankHandler(config)
-        elif config.mode == "cycle":
-            return CycleBlankHandler(config)
-        raise ValueError("unsupported blank mode")
+    def create_handler(mode: Literal["sample"] | Literal["cycle"], index: int) -> BlankHandler:
+        if mode == "sample":
+            return SampleBlankHandler(index)
+        elif mode == "cycle":
+            return CycleBlankHandler(index)
 
     def run(self, lf: pl.LazyFrame) -> pl.LazyFrame:
         return lf.pipe(self._join_blank).pipe(self._subtract_blank)

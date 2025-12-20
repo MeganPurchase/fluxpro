@@ -136,12 +136,11 @@ def reformat_for_output(lf: pl.LazyFrame) -> pl.DataFrame:
     )
 
 
-def process_file(input_file: Path, config: Config):
-
+def read_lf(input_file: Path) -> pl.LazyFrame:
     separator = detect_separator(input_file)
     skip_rows = detect_header_row(input_file, separator)
 
-    lf = pl.scan_csv(
+    return pl.scan_csv(
         input_file,
         has_header=True,
         skip_rows=skip_rows,
@@ -149,9 +148,14 @@ def process_file(input_file: Path, config: Config):
         separator=separator,
     )
 
+
+def process_file(input_file: Path, config: Config):
+
+    lf = read_lf(input_file)
+
     standardizer = DataStandardizer()
 
-    blank_handler = BlankHandler.create_handler(config.blank)
+    blank_handler = BlankHandler.create_handler(config.blank.mode, config.blank.index)
 
     df = (
         lf.pipe(standardizer.run)
