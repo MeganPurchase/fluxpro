@@ -6,6 +6,7 @@ from polars import testing
 
 from fluxpro.config import Config
 from fluxpro.process import process_file
+from fluxpro.output import write_output
 
 
 def assert_csv_equal_or_update(actual_path: Path, expected_path: Path, update=False):
@@ -26,9 +27,10 @@ def run_integration_case(
 ):
     """Shared integration runner for all 3 cases."""
 
-    file = shutil.copy(input_file, tmp_path)
+    input_file = Path(shutil.copy(input_file, tmp_path))
 
-    process_file(Path(file), config)
+    df = process_file(input_file, config)
+    write_output(input_file, df)
 
     update = request.config.getoption("--update")
 

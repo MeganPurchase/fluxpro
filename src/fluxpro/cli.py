@@ -4,6 +4,7 @@ import click
 import polars as pl
 
 from .config import Config
+from . import output
 from . import process
 from . import plotting
 
@@ -44,7 +45,12 @@ def generate():
 def run(input_file: Path, config: Path):
     """Process the given file"""
     cfg = Config.from_toml(config)
-    process.process_file(input_file, cfg)
+    df = process.process_file(input_file, cfg)
+    output_files = output.write_output(input_file, df)
+
+    click.echo("Output files:", err=True)
+    for file in output_files:
+        click.echo("  " + file.as_posix(), err=True)
 
 
 @cli.command()
