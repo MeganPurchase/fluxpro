@@ -11,10 +11,12 @@ class BlankHandler(ABC):
         self.index = index
 
     @staticmethod
-    def create_handler(mode: Literal["sample"] | Literal["cycle"], index: int) -> BlankHandler:
-        if mode == "sample":
+    def create_handler(
+        mode: Literal["multiplexed"] | Literal["single"], index: int
+    ) -> BlankHandler:
+        if mode == "multiplexed":
             return SampleBlankHandler(index)
-        elif mode == "cycle":
+        elif mode == "single":
             return CycleBlankHandler(index)
 
     def run(self, lf: pl.LazyFrame) -> pl.LazyFrame:

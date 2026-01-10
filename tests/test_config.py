@@ -10,9 +10,8 @@ def test_from_toml_must_read_config(data_dir: Path):
     assert config.samples.minutes_per_sample == 10
     assert config.samples.discard_minutes == 2
     assert config.flux.flow_rate == 0.1
-    assert config.flux.chamber_volume == 0.01
     assert config.flux.soil_surface_area == 0.05
-    assert config.blank.mode == "sample"
+    assert config.blank.mode == "multiplexed"
     assert config.blank.index == 1
 
 
@@ -26,11 +25,10 @@ def test_generate_example_toml_must_write_file(data_dir: Path, request):
         ),
         flux=Config.FluxConfig(
             flow_rate=0.1,
-            chamber_volume=0.1,
             soil_surface_area=0.05,
         ),
         blank=Config.BlankConfig(
-            mode="sample",
+            mode="multiplexed",
             index=1,
         ),
     )

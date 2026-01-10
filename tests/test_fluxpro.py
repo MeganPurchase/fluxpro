@@ -57,11 +57,10 @@ def test_pipeline_integration_1(data_dir: Path, tmp_path: Path, request):
         ),
         flux=Config.FluxConfig(
             flow_rate=1,
-            chamber_volume=1,
             soil_surface_area=1,
         ),
         blank=Config.BlankConfig(
-            mode="sample",
+            mode="multiplexed",
             index=1,
         ),
     )
@@ -86,11 +85,10 @@ def test_pipeline_integration_2(data_dir: Path, tmp_path: Path, request):
         ),
         flux=Config.FluxConfig(
             flow_rate=1,
-            chamber_volume=1,
             soil_surface_area=1,
         ),
         blank=Config.BlankConfig(
-            mode="sample",
+            mode="multiplexed",
             index=1,
         ),
     )
@@ -115,11 +113,10 @@ def test_pipeline_integration_3(data_dir: Path, tmp_path: Path, request):
         ),
         flux=Config.FluxConfig(
             flow_rate=1,
-            chamber_volume=1,
             soil_surface_area=1,
         ),
         blank=Config.BlankConfig(
-            mode="cycle",
+            mode="single",
             index=1,
         ),
     )

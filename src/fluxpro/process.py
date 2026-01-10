@@ -75,9 +75,7 @@ def compute_statistics(lf: pl.LazyFrame) -> pl.LazyFrame:
     )
 
 
-def compute_flux(
-    lf: pl.LazyFrame, flow: float, chamber_volume: float, soil_surface_area: float
-) -> pl.LazyFrame:
+def compute_flux(lf: pl.LazyFrame, flow: float, soil_surface_area: float) -> pl.LazyFrame:
 
     nitrogen_mass = 14.006747
     carbon_mass = 12.0111
@@ -173,7 +171,6 @@ def process_file(input_file: Path, config: Config):
         .pipe(
             compute_flux,
             config.flux.flow_rate,
-            config.flux.chamber_volume,
             config.flux.soil_surface_area,
         )
         .pipe(blank_handler.run)

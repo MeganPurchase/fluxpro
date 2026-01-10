@@ -8,16 +8,14 @@ minutes_per_sample = 10
 # number of minutes at the start of each sample that are removed from the analysis to allow the readings to settle
 discard_minutes = 2
 
-[flux]
+[flux-calculation]
 # flow rate through the chamber (L/min)
 flow_rate = 0.1
-# volume of the chamber headspace (m^3)
-chamber_volume = 0.01
 # surface area of the soil (m^2)
 soil_surface_area = 0.05
 
 [blank]
-# specifies whether to use a sample or a cycle as the blank reading. Options: 'sample' or 'cycle'
-mode = 'sample'
-# index of the blank (counting up from 1)
+# specifies whether the blank is a multiplexed or a single cycle is used as the blank reading, options: 'multiplexed' or 'single'
+mode = 'multiplexed'
+# index of the blank, either the sample index in the multiplexer or the index of the cycle used for the blank (counting up from 1)
 index = 1

@@ -21,7 +21,7 @@ file. This file should be edited to match the parameters of your experiment.
 
 When the configuration file is ready, use
 ```bash
-fluxpro run path/to/input --config path/to/config`
+fluxpro run path/to/input --config path/to/config
 ```
 This will run the analysis and write an output file for each sample.
 

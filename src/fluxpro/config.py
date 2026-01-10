@@ -30,23 +30,23 @@ class Config:
         flow_rate: float = field(
             metadata={"doc": "flow rate through the chamber (L/min)", "example": 0.1}
         )
-        chamber_volume: float = field(
-            metadata={"doc": "volume of the chamber headspace (m^3)", "example": 0.01}
-        )
         soil_surface_area: float = field(
             metadata={"doc": "surface area of the soil (m^2)", "example": 0.05}
         )
 
     @dataclass
     class BlankConfig:
-        mode: Literal["sample"] | Literal["cycle"] = field(
+        mode: Literal["multiplexed"] | Literal["single"] = field(
             metadata={
-                "doc": "specifies whether to use a sample or a cycle as the blank reading. Options: 'sample' or 'cycle'",
-                "example": "sample",
+                "doc": "specifies whether the blank is a multiplexed or a single cycle is used as the blank reading, options: 'multiplexed' or 'single'",
+                "example": "multiplexed",
             }
         )
         index: int = field(
-            metadata={"doc": "index of the blank (counting up from 1)", "example": 1}
+            metadata={
+                "doc": "index of the blank, either the sample index in the multiplexer or the index of the cycle used for the blank (counting up from 1)",
+                "example": 1,
+            }
         )
 
     samples: SampleConfig
@@ -59,7 +59,7 @@ class Config:
             data = tomllib.load(f)
             return Config(
                 samples=Config.SampleConfig(**data["samples"]),
-                flux=Config.FluxConfig(**data["flux"]),
+                flux=Config.FluxConfig(**data["flux-calculation"]),
                 blank=Config.BlankConfig(**data["blank"]),
             )
 
@@ -78,7 +78,7 @@ class Config:
 
         toml_sections = [
             section_to_toml("samples", Config.SampleConfig),
-            section_to_toml("flux", Config.FluxConfig),
+            section_to_toml("flux-calculation", Config.FluxConfig),
             section_to_toml("blank", Config.BlankConfig),
         ]
 
