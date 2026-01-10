@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from unittest.mock import MagicMock
 
 from click.testing import CliRunner
 
@@ -45,3 +46,19 @@ def test_run_must_succeed(monkeypatch, tmp_path: Path, data_dir: Path):
         assert output_file.as_posix() in result.output
         os.remove(output_file)
 
+
+def test_plot_must_succeed(data_dir: Path, monkeypatch):
+
+    mock_chart = MagicMock()
+    monkeypatch.setattr("fluxpro.cli.plotting.plot_df", lambda _: mock_chart)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        cli,
+        [
+            "plot",
+            (data_dir / "expected/case1/FTIR_0304_2_out.csv").as_posix(),
+        ],
+    )
+    assert result.exit_code == 0
+    mock_chart.show.assert_called_once()

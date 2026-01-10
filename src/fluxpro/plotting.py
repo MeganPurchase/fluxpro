@@ -25,7 +25,7 @@ def plot_df_altair(df: pl.DataFrame):
     return tidy
 
 
-def plot_df(df: pl.DataFrame):
+def plot_df(df: pl.DataFrame) -> alt.FacetChart:
     tidy = plot_df_altair(df)
 
     base = alt.Chart(tidy)
@@ -64,5 +64,4 @@ def plot_df(df: pl.DataFrame):
         .resolve_scale(y="independent")
     )
 
-    alt.renderers.enable("browser")
-    chart.show()
+    return chart
