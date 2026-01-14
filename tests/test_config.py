@@ -15,7 +15,7 @@ def test_from_toml_must_read_config(data_dir: Path):
     assert config.blank.index == 1
 
 
-def test_generate_example_toml_must_write_file(data_dir: Path, request):
+def test_generate_example_toml_must_write_file(data_dir: Path, update_expected: bool):
     config = Config(
         samples=Config.SampleConfig(
             total_cycles=22,
@@ -35,7 +35,7 @@ def test_generate_example_toml_must_write_file(data_dir: Path, request):
 
     toml = config.generate_example_toml()
 
-    if request.config.getoption("--update"):
+    if update_expected:
         with open(data_dir / "config.toml", "w") as f:
             f.write(toml)
 

@@ -11,11 +11,18 @@ from . import plotting
 
 
 DEFAULT_CONFIG_PATH = Path("config.toml")
+ASCII_ART = """\
+ ___ _
+|  _| |_ _ _ _ ___ ___ ___
+|  _| | | |_'_| . |  _| . |
+|_| |_|___|_,_|  _|_| |___|
+              |_|
+"""
 
 
 @click.group(context_settings={"help_option_names": ["-h", "--help"]})
 def cli():
-    pass
+    click.secho(ASCII_ART, bold=True, fg="green")
 
 
 @cli.command()

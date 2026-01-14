@@ -23,7 +23,7 @@ def assert_csv_equal_or_update(actual_path: Path, expected_path: Path, update=Fa
 
 
 def run_integration_case(
-    input_file: Path, config: Config, expected_dir: Path, tmp_path: Path, request
+    input_file: Path, config: Config, expected_dir: Path, tmp_path: Path, update_expected: bool
 ):
     """Shared integration runner for all 3 cases."""
 
@@ -31,8 +31,6 @@ def run_integration_case(
 
     df = process_file(input_file, config)
     write_output(input_file, df)
-
-    update = request.config.getoption("--update")
 
     sample_numbers = []
     if config.blank.mode == "sample":
@@ -45,10 +43,10 @@ def run_integration_case(
     for i in sample_numbers:
         actual = tmp_path / f"{input_file.stem}_{i}_out.csv"
         expected = expected_dir / f"{input_file.stem}_{i}_out.csv"
-        assert_csv_equal_or_update(actual, expected, update=update)
+        assert_csv_equal_or_update(actual, expected, update=update_expected)
 
 
-def test_pipeline_integration_1(data_dir: Path, tmp_path: Path, request):
+def test_pipeline_integration_1(data_dir: Path, tmp_path: Path, update_expected: bool):
 
     config = Config(
         samples=Config.SampleConfig(
@@ -72,11 +70,11 @@ def test_pipeline_integration_1(data_dir: Path, tmp_path: Path, request):
         config,
         expected_dir=data_dir / "expected/case1",
         tmp_path=tmp_path,
-        request=request,
+        update_expected=update_expected,
     )
 
 
-def test_pipeline_integration_2(data_dir: Path, tmp_path: Path, request):
+def test_pipeline_integration_2(data_dir: Path, tmp_path: Path, update_expected: bool):
 
     config = Config(
         samples=Config.SampleConfig(
@@ -100,11 +98,11 @@ def test_pipeline_integration_2(data_dir: Path, tmp_path: Path, request):
         config,
         expected_dir=data_dir / "expected/case2",
         tmp_path=tmp_path,
-        request=request,
+        update_expected=update_expected,
     )
 
 
-def test_pipeline_integration_3(data_dir: Path, tmp_path: Path, request):
+def test_pipeline_integration_3(data_dir: Path, tmp_path: Path, update_expected: bool):
 
     config = Config(
         samples=Config.SampleConfig(
@@ -128,5 +126,5 @@ def test_pipeline_integration_3(data_dir: Path, tmp_path: Path, request):
         config,
         expected_dir=data_dir / "expected/case3",
         tmp_path=tmp_path,
-        request=request,
+        update_expected=update_expected,
     )

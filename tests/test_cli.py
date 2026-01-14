@@ -3,9 +3,17 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 from click.testing import CliRunner
+import pytest
 
-from fluxpro.cli import cli
+from fluxpro.cli import cli, ASCII_ART
 from fluxpro.config import Config
+
+
+@pytest.mark.parametrize("command", ["generate", "run", "plot"])
+def test_must_display_ascii_art(command):
+    runner = CliRunner()
+    result = runner.invoke(cli, [command])
+    assert ASCII_ART in result.output
 
 
 def test_generate_must_write_valid_file(monkeypatch, tmp_path: Path):
@@ -13,7 +21,7 @@ def test_generate_must_write_valid_file(monkeypatch, tmp_path: Path):
     runner = CliRunner()
     result = runner.invoke(cli, ["generate"])
     assert result.exit_code == 0
-    assert result.output == "Example config file written to config.toml\n"
+    assert "\nExample config file written to config.toml\n" in result.output
 
     with open(tmp_path / "config.toml") as f:
         assert f.read() == Config.generate_example_toml()

@@ -10,5 +10,10 @@ def pytest_addoption(parser):
 
 
 @pytest.fixture
+def update_expected(request) -> bool:
+    return request.config.getoption("--update")
+
+
+@pytest.fixture
 def data_dir() -> Path:
     return Path(__file__).parent.resolve() / "test-data"

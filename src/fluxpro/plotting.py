@@ -2,6 +2,8 @@ import polars as pl
 import re
 import altair as alt
 
+alt.data_transformers.enable("vegafusion")
+
 
 def plot_df_altair(df: pl.DataFrame):
 
