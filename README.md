@@ -1,6 +1,6 @@
 # fluxpro
 
-This package provides the `fluxpro` program for processing the output of the Teledyne NOy analyser and FTIR.
+This package provides the `fluxpro` program for processing gas flux data. Currently supports the output of the Teledyne T200U NOy analyser, Protea atmosFIR FTIR analyser, and Airyx ICAD-HONO-210L monitor.
 
 ## Installation
 
