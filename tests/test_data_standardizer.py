@@ -24,6 +24,18 @@ testdata = [
         datetime.timedelta(seconds=29),
         datetime.timedelta(minutes=7, seconds=2),
     ),
+    (
+        "FTIR.log",
+        ["NH3", "N2O", "O3", "CH4", "CO2", "CO", "NO2", "datetime"],
+        datetime.timedelta(minutes=1),
+        datetime.timedelta(minutes=1),
+    ),
+    (
+        "TELEDYNE.txt",
+        ["NO", "NOY", "NOY-NO", "datetime"],
+        datetime.timedelta(minutes=1),
+        datetime.timedelta(minutes=1),
+    ),
 ]
 
 

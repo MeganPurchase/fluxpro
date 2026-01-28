@@ -18,6 +18,9 @@ from fluxpro.process import (
         ("FTIR_0304.csv", ","),
         ("NOy_0404_CRED.csv", ","),
         ("2025_11_08_NO2_HONO_Channel1_Data.dat", "\t"),
+        ("FTIR.log", "\t"),
+        ("AIRYX.dat", "\t"),
+        ("TELEDYNE.txt", ","),
     ],
 )
 def test_detect_separator_must_succeed_for_supported_formats(
@@ -27,12 +30,24 @@ def test_detect_separator_must_succeed_for_supported_formats(
     assert actual == expected
 
 
+def test_detect_separator_must_throw_when_it_fails(tmp_path: Path):
+    path = tmp_path / "test.txt"
+    with open(path, "w") as file:
+        file.write("x" * 50)
+
+    with pytest.raises(ValueError):
+        detect_separator(path)
+
+
 @pytest.mark.parametrize(
     "file,separator,expected",
     [
         ("FTIR_0304.csv", ",", 2),
         ("NOy_0404_CRED.csv", ",", 0),
         ("2025_11_08_NO2_HONO_Channel1_Data.dat", "\t", 2),
+        ("FTIR.log", "\t", 2),
+        ("AIRYX.dat", "\t", 2),
+        ("TELEDYNE.txt", ",", 0),
     ],
 )
 def test_detect_header_row_must_succeed_for_supported_formats(

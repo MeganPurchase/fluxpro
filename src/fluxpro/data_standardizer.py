@@ -6,31 +6,45 @@ class DataStandardizer:
     COL_DATETIME = "datetime"
     GAS_IDENTIFIERS = {
         "Ammonia / ppm (cal)": "NH3",
+        "NH3 / ppm (cal)": "NH3",
         "NO2 (ppb)": "NO2",
         "Nitrogen Dioxide / ppm (cal)": "NO2",
+        "NO2 / ppm (cal)": "NO2",
         "Nitrous Oxide / ppm (cal)": "N2O",
+        "N2O / ppm (cal)": "N2O",
         "Ozone / ppm (cal)": "O3",
+        "O3 / ppm (cal)": "O3",
         "HONO (ppb)": "HONO",
         "NO Conc": "NO",
         "NOY Conc": "NOY",
         "NOY-NO Conc": "NOY-NO",
         "Carbon Monoxide / ppm (cal)": "CO",
+        "CO / ppm (cal)": "CO",
         "CO2 (ppm)": "CO2",
         "Carbon Dioxide / ppm (cal)": "CO2",
+        "CO2 / ppm (cal)": "CO2",
         "Methane / ppm (cal)": "CH4",
+        "CH4 / ppm (cal)": "CH4",
     }
 
     def run(self, lf: pl.LazyFrame) -> pl.LazyFrame:
         return (
             lf.pipe(self._standardize_datetime)
             .pipe(self._select_input_columns)
+            .pipe(self._strip_whitespace)
             .rename(self._sanitize_column_names)
             .pipe(self._standardize_units)
             .rename(self._remove_units_from_names)
         )
 
     def _standardize_datetime(self, lf: pl.LazyFrame) -> pl.LazyFrame:
-        possible_formats = ["%d/%m/%Y %H:%M", "%m/%d/%Y %H:%M", "%Y-%m-%d %H:%M:%S"]
+        possible_formats = [
+            "%d/%m/%Y %H:%M",
+            "%m/%d/%Y %H:%M",
+            "%Y-%m-%d %H:%M:%S",
+            "%Y/%m/%d %H:%M:%S",
+            "%m/%d/%Y %I:%M:%S %p",
+        ]
 
         mapping = {lf.collect_schema().names()[0]: self.COL_DATETIME}
         lf = lf.rename(mapping)
@@ -56,6 +70,9 @@ class DataStandardizer:
         ]
 
         return lf.select(*names, "datetime")
+
+    def _strip_whitespace(self, lf: pl.LazyFrame) -> pl.LazyFrame:
+        return lf.with_columns(pl.col(pl.String).str.strip_chars().cast(pl.Float64, strict=False))
 
     def _sanitize_column_names(self, name: str) -> str:
         name = name.strip()

@@ -33,13 +33,14 @@ def run_integration_case(
     write_output(input_file, df)
 
     sample_numbers = []
-    if config.blank.mode == "sample":
+    if config.blank.mode == "multiplexed":
         sample_numbers = [
             i for i in range(1, config.samples.samples_per_cycle + 1) if i != config.blank.index
         ]
-    elif config.blank.mode == "cycle":
+    elif config.blank.mode == "single":
         sample_numbers = [i for i in range(1, config.samples.samples_per_cycle + 1)]
 
+    assert len(sample_numbers) > 0
     for i in sample_numbers:
         actual = tmp_path / f"{input_file.stem}_{i}_out.csv"
         expected = expected_dir / f"{input_file.stem}_{i}_out.csv"
@@ -125,6 +126,90 @@ def test_pipeline_integration_3(data_dir: Path, tmp_path: Path, update_expected:
         data_dir / "2025_11_08_NO2_HONO_Channel1_Data.dat",
         config,
         expected_dir=data_dir / "expected/case3",
+        tmp_path=tmp_path,
+        update_expected=update_expected,
+    )
+
+
+def test_integration_airyx(data_dir: Path, tmp_path: Path, update_expected: bool):
+
+    config = Config(
+        samples=Config.SampleConfig(
+            total_cycles=24,
+            samples_per_cycle=1,
+            minutes_per_sample=60,
+            discard_minutes=5,
+        ),
+        flux=Config.FluxConfig(
+            flow_rate=1.7,
+            soil_surface_area=0.003849,
+        ),
+        blank=Config.BlankConfig(
+            mode="single",
+            index=1,
+        ),
+    )
+
+    run_integration_case(
+        data_dir / "AIRYX.dat",
+        config,
+        expected_dir=data_dir / "expected/airyx",
+        tmp_path=tmp_path,
+        update_expected=update_expected,
+    )
+
+
+def test_integration_ftir(data_dir: Path, tmp_path: Path, update_expected: bool):
+
+    config = Config(
+        samples=Config.SampleConfig(
+            total_cycles=24,
+            samples_per_cycle=6,
+            minutes_per_sample=10,
+            discard_minutes=2,
+        ),
+        flux=Config.FluxConfig(
+            flow_rate=1.0,
+            soil_surface_area=0.003849,
+        ),
+        blank=Config.BlankConfig(
+            mode="multiplexed",
+            index=1,
+        ),
+    )
+
+    run_integration_case(
+        data_dir / "FTIR.log",
+        config,
+        expected_dir=data_dir / "expected/ftir",
+        tmp_path=tmp_path,
+        update_expected=update_expected,
+    )
+
+
+def test_integration_teledyne(data_dir: Path, tmp_path: Path, update_expected: bool):
+
+    config = Config(
+        samples=Config.SampleConfig(
+            total_cycles=24,
+            samples_per_cycle=6,
+            minutes_per_sample=10,
+            discard_minutes=2,
+        ),
+        flux=Config.FluxConfig(
+            flow_rate=0.9,
+            soil_surface_area=0.003849,
+        ),
+        blank=Config.BlankConfig(
+            mode="multiplexed",
+            index=1,
+        ),
+    )
+
+    run_integration_case(
+        data_dir / "TELEDYNE.txt",
+        config,
+        expected_dir=data_dir / "expected/teledyne",
         tmp_path=tmp_path,
         update_expected=update_expected,
     )

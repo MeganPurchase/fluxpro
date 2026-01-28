@@ -10,10 +10,21 @@ from .config import Config
 
 
 def detect_separator(input_file: Path) -> str:
-    if input_file.suffix == ".dat":
-        return "\t"
-    else:
-        return ","
+    tab_count = 0
+    comma_count = 0
+    with open(input_file, "r") as file:
+        for char in file.read():
+            if char == "\t":
+                tab_count += 1
+            elif char == ",":
+                comma_count += 1
+
+            if tab_count > 50:
+                return "\t"
+            elif comma_count > 50:
+                return ","
+
+        raise ValueError("failed to detect file separator")
 
 
 def detect_header_row(input_file: Path, separator: str) -> int:

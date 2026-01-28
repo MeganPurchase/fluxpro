@@ -13736,15 +13736,15 @@
       "axes": [
         {
           "scale": "x",
+          "title": "Cycle",
           "tickCount": {
             "signal": "ceil(child_width/40)"
           },
-          "orient": "bottom",
-          "title": "Cycle",
+          "grid": false,
           "labelFlush": true,
           "labelOverlap": true,
-          "zindex": 0,
-          "grid": false
+          "orient": "bottom",
+          "zindex": 0
         }
       ],
       "role": "column-footer"
@@ -13771,11 +13771,11 @@
       },
       "encode": {
         "update": {
-          "width": {
-            "signal": "child_width"
-          },
           "height": {
             "signal": "child_height"
+          },
+          "width": {
+            "signal": "child_width"
           }
         }
       },
@@ -13924,6 +13924,9 @@
           },
           "encode": {
             "update": {
+              "fill": {
+                "value": "transparent"
+              },
               "x": {
                 "field": "cycle",
                 "scale": "x"
@@ -13932,14 +13935,11 @@
                 "field": "raw",
                 "scale": "child_y"
               },
-              "opacity": {
-                "value": 0.7
-              },
               "stroke": {
                 "value": "pink"
               },
-              "fill": {
-                "value": "transparent"
+              "opacity": {
+                "value": 0.7
               }
             }
           },
@@ -13955,36 +13955,36 @@
           },
           "encode": {
             "update": {
-              "tooltip": {
-                "signal": "{\"y\": format(datum[\"y\"], \"\"), \"y + yerr\": format(datum[\"upper_y\"], \"\"), \"y - yerr\": format(datum[\"lower_y\"], \"\"), \"x\": format(datum[\"x\"], \"\")}"
-              },
-              "width": {
-                "value": 5
-              },
-              "height": {
-                "value": 1
-              },
-              "yc": {
-                "field": "lower_y",
-                "scale": "child_y"
-              },
               "xc": {
                 "field": "x",
                 "scale": "x"
               },
+              "tooltip": {
+                "signal": "{\"y\": format(datum[\"y\"], \"\"), \"y + yerr\": format(datum[\"upper_y\"], \"\"), \"y - yerr\": format(datum[\"lower_y\"], \"\"), \"x\": format(datum[\"x\"], \"\")}"
+              },
+              "height": {
+                "value": 1
+              },
               "opacity": {
                 "value": 0.7
+              },
+              "width": {
+                "value": 5
+              },
+              "yc": {
+                "field": "lower_y",
+                "scale": "child_y"
               },
               "fill": {
                 "value": "#4c78a8"
               }
             }
           },
+          "aria": false,
           "style": [
             "tick",
             "errorbar-ticks"
-          ],
-          "aria": false
+          ]
         },
         {
           "type": "rect",
@@ -13994,28 +13994,28 @@
           },
           "encode": {
             "update": {
+              "width": {
+                "value": 5
+              },
+              "yc": {
+                "field": "upper_y",
+                "scale": "child_y"
+              },
+              "height": {
+                "value": 1
+              },
+              "tooltip": {
+                "signal": "{\"y\": format(datum[\"y\"], \"\"), \"y + yerr\": format(datum[\"upper_y\"], \"\"), \"y - yerr\": format(datum[\"lower_y\"], \"\"), \"x\": format(datum[\"x\"], \"\")}"
+              },
+              "opacity": {
+                "value": 0.7
+              },
               "fill": {
                 "value": "#4c78a8"
               },
               "xc": {
                 "field": "x",
                 "scale": "x"
-              },
-              "yc": {
-                "field": "upper_y",
-                "scale": "child_y"
-              },
-              "tooltip": {
-                "signal": "{\"y\": format(datum[\"y\"], \"\"), \"y + yerr\": format(datum[\"upper_y\"], \"\"), \"y - yerr\": format(datum[\"lower_y\"], \"\"), \"x\": format(datum[\"x\"], \"\")}"
-              },
-              "width": {
-                "value": 5
-              },
-              "opacity": {
-                "value": 0.7
-              },
-              "height": {
-                "value": 1
               }
             }
           },
@@ -14066,19 +14066,19 @@
           },
           "encode": {
             "update": {
+              "stroke": {
+                "value": "red"
+              },
+              "y": {
+                "field": "avg",
+                "scale": "child_y"
+              },
               "fill": {
                 "value": "transparent"
               },
               "x": {
                 "field": "average_cycle",
                 "scale": "x"
-              },
-              "y": {
-                "field": "avg",
-                "scale": "child_y"
-              },
-              "stroke": {
-                "value": "red"
               }
             }
           },
@@ -14121,62 +14121,62 @@
             },
             0
           ],
-          "zero": true,
-          "nice": true
+          "nice": true,
+          "zero": true
         }
       ],
       "axes": [
         {
           "scale": "x",
-          "gridScale": "child_y",
+          "grid": true,
           "labels": false,
+          "aria": false,
+          "ticks": false,
+          "minExtent": 0,
+          "gridScale": "child_y",
           "orient": "bottom",
           "tickCount": {
             "signal": "ceil(child_width/40)"
           },
-          "aria": false,
           "domain": false,
           "zindex": 0,
-          "minExtent": 0,
-          "maxExtent": 0,
-          "ticks": false,
-          "grid": true
+          "maxExtent": 0
         },
         {
           "scale": "child_y",
-          "minExtent": 0,
-          "aria": false,
-          "grid": true,
+          "zindex": 0,
           "domain": false,
-          "tickCount": {
-            "signal": "ceil(child_height/40)"
-          },
+          "aria": false,
+          "minExtent": 0,
           "ticks": false,
           "gridScale": "x",
+          "orient": "left",
           "labels": false,
-          "zindex": 0,
           "maxExtent": 0,
-          "orient": "left"
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(child_height/40)"
+          }
         },
         {
           "scale": "child_y",
-          "orient": "left",
+          "zindex": 0,
+          "title": "Flux /ng\u00b7m\u207b\u00b2\u00b7min\u207b\u00b9",
           "grid": false,
           "labelOverlap": true,
           "tickCount": {
             "signal": "ceil(child_height/40)"
           },
-          "title": "Flux /ng\u00b7m\u207b\u00b2\u00b7min\u207b\u00b9",
-          "zindex": 0
+          "orient": "left"
         }
       ],
       "title": {
         "text": {
           "signal": "isValid(parent[\"gas\"]) ? parent[\"gas\"] : \"\"+parent[\"gas\"]"
         },
-        "style": "guide-label",
         "frame": "group",
-        "offset": 10
+        "offset": 10,
+        "style": "guide-label"
       },
       "style": "cell"
     }
@@ -14211,16 +14211,16 @@
           "signal": "child_width"
         }
       ],
-      "zero": true,
-      "nice": true
+      "nice": true,
+      "zero": true
     }
   ],
-  "background": "white",
+  "padding": 5,
   "layout": {
     "padding": 20,
     "bounds": "full",
     "align": "none",
     "columns": 3
   },
-  "padding": 5
+  "background": "white"
 }
