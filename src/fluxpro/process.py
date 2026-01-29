@@ -153,7 +153,7 @@ def read_lf(input_file: Path) -> pl.LazyFrame:
         input_file,
         has_header=True,
         skip_rows=skip_rows,
-        infer_schema_length=1000,
+        infer_schema_length=None,
         separator=separator,
     )
 
