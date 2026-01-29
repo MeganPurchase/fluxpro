@@ -1,4 +1,5 @@
 from pathlib import Path
+from importlib.metadata import version
 
 import click
 import polars as pl
@@ -21,6 +22,7 @@ ASCII_ART = """\
 
 
 @click.group(context_settings={"help_option_names": ["-h", "--help"]})
+@click.version_option(version=version("fluxpro"), prog_name="fluxpro")
 def cli():
     click.secho(ASCII_ART, bold=True, fg="green")
 

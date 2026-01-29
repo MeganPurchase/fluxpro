@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 from unittest.mock import MagicMock
+from importlib.metadata import version
 
 from click.testing import CliRunner
 import pytest
@@ -14,6 +15,12 @@ def test_must_display_ascii_art(command):
     runner = CliRunner()
     result = runner.invoke(cli, [command])
     assert ASCII_ART in result.output
+
+
+def test_must_show_version_number():
+    runner = CliRunner()
+    result = runner.invoke(cli, ["--version"])
+    assert f"fluxpro, version {version("fluxpro")}\n" == result.output
 
 
 def test_generate_must_write_valid_file(monkeypatch, tmp_path: Path):
