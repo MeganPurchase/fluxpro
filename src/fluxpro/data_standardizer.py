@@ -29,7 +29,7 @@ class DataStandardizer:
 
     def run(self, lf: pl.LazyFrame) -> pl.LazyFrame:
         return (
-            lf.pipe(self._standardize_datetime)
+            lf.pipe(self.standardize_datetime)
             .pipe(self._select_input_columns)
             .pipe(self._strip_whitespace)
             .rename(self._sanitize_column_names)
@@ -37,12 +37,13 @@ class DataStandardizer:
             .rename(self._remove_units_from_names)
         )
 
-    def _standardize_datetime(self, lf: pl.LazyFrame) -> pl.LazyFrame:
+    def standardize_datetime(self, lf: pl.LazyFrame) -> pl.LazyFrame:
         possible_formats = [
             "%d/%m/%Y %H:%M",
             "%m/%d/%Y %H:%M",
             "%Y-%m-%d %H:%M:%S",
             "%Y/%m/%d %H:%M:%S",
+            "%m/%d/%y %I:%M:%S %p",
             "%m/%d/%Y %I:%M:%S %p",
         ]
 
@@ -93,11 +94,6 @@ class DataStandardizer:
         raise ValueError(f"failed to detect unit for column '{name}'")
 
     def _standardize_units(self, lf: pl.LazyFrame) -> pl.LazyFrame:
-        R = 0.082057366080960  # L*atm/K/mol
-        T = 298.15  # K
-        P = 1  # atm
-        molar_volume = R * T / P  # L/mol
-
         expressions = []
         for column in lf.collect_schema().names():
             if column == self.COL_DATETIME:
@@ -105,13 +101,12 @@ class DataStandardizer:
 
             scale_factor = 0
             if column.endswith("ppm"):
-                scale_factor = 1e-6
+                scale_factor = 1e3
             elif column.endswith("ppb"):
-                scale_factor = 1e-9
+                scale_factor = 1
+            expressions.append(pl.col(column) * scale_factor)
 
-            expressions.append(pl.col(column) * scale_factor / molar_volume)
-
-        # All gases now have units of mol/L
+        # All gases now have units of ppb
         return lf.with_columns(expressions)
 
     def _remove_units_from_names(self, name: str) -> str:

@@ -33,6 +33,21 @@ class Config:
         soil_surface_area: float = field(
             metadata={"doc": "surface area of the soil (m^2)", "example": 0.05}
         )
+        temperature: float | Path = field(
+            default=298.15,
+            metadata={
+                "doc": """temperature used to calculate the molar volume:
+  - fixed temperature (K)
+  - path to a file containing the temperature timeseries
+      File format:
+      - .csv
+      - first row: ignored
+      - second row: column headers
+      - first column: datetime values
+      - second column: temperature in fahrenheit""",
+                "example": 298.15,
+            },
+        )
 
     @dataclass
     class BlankConfig:
@@ -71,7 +86,8 @@ class Config:
         ):
             lines = [f"[{section_name}]"]
             for f in fields(config):
-                lines.append(f"# {f.metadata.get("doc")}")
+                for line in f.metadata.get("doc").splitlines():
+                    lines.append(f"# {line}")
                 example = f.metadata.get("example")
                 lines.append(f"{f.name} = {repr(example)}")
             return "\n".join(lines)

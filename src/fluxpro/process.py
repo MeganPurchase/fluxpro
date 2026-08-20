@@ -4,6 +4,7 @@ from datetime import timedelta
 
 from fluxpro.blank_handler import BlankHandler
 from fluxpro.data_standardizer import DataStandardizer
+from fluxpro.temperature import read_temperature
 import polars as pl
 
 from .config import Config
@@ -110,17 +111,24 @@ def compute_flux(lf: pl.LazyFrame, flow: float, soil_surface_area: float) -> pl.
             ],
         }
     )
-    nano = 1e9
+    R = 0.082057366080960  # L*atm/K/mol
+    T = 298.15  # K
+    P = 1  # atm
+    molar_volume = R * T / P  # L/mol
 
     # see https://amt.copernicus.org/articles/15/2807/2022/ for equation
-    # conc  * flow  / soil_surface_area * molar_mass * nano
-    # mol/L * L/min / m^2               * g/mol      * n
-    # concentration has units of mol/L from DataStandardizer
+    # conc          * flow  / soil_surface_area * molar_mass / molar_volume
+    # (ppb or nano) * L/min / m^2               * g/mol      / L/mol
+    # concentration has units of ppb from DataStandardizer
     # flux returned in units of ng/m^2/min
     return (
         lf.join(molar_masses, on="gas")
         .with_columns(
-            flux=pl.col("concentration") * flow / soil_surface_area * pl.col("molar_mass") * nano
+            flux=pl.col("concentration")
+            * flow
+            / soil_surface_area
+            * pl.col("molar_mass")
+            / molar_volume
         )
         .drop("concentration", "molar_mass")
     )
