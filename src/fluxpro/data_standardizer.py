@@ -58,7 +58,7 @@ class DataStandardizer:
                 )
                 range = lf_diff.select(pl.col("diff").max() - pl.col("diff").min()).collect().item()
                 if range < datetime.timedelta(hours=1):
-                    return lf_with_time
+                    return lf_with_time.sort(self.COL_DATETIME)
             except pl.exceptions.InvalidOperationError:
                 continue
         raise ValueError("unexpected datetime format")

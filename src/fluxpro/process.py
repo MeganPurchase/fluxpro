@@ -87,7 +87,7 @@ def compute_statistics(lf: pl.LazyFrame) -> pl.LazyFrame:
     )
 
 
-def compute_flux(lf: pl.LazyFrame, flow: float, soil_surface_area: float) -> pl.LazyFrame:
+def compute_flux(lf: pl.LazyFrame, flux_config: Config.FluxConfig) -> pl.LazyFrame:
 
     nitrogen_mass = 14.006747
     carbon_mass = 12.0111
@@ -114,6 +114,19 @@ def compute_flux(lf: pl.LazyFrame, flow: float, soil_surface_area: float) -> pl.
     R = 0.082057366080960  # L*atm/K/mol
     T = 298.15  # K
     P = 1  # atm
+    flow = flux_config.flow_rate
+    soil_surface_area = flux_config.soil_surface_area
+    temperature = flux_config.temperature
+
+    match temperature:
+        case float():
+            T = temperature
+        case Path():
+            temperature_lf = read_temperature(temperature)
+            lf = lf.join_asof(
+                temperature_lf, on="datetime", strategy="nearest", check_sortedness=False
+            )
+
     molar_volume = R * T / P  # L/mol
 
     # see https://amt.copernicus.org/articles/15/2807/2022/ for equation
@@ -189,8 +202,7 @@ def process_file(input_file: Path, config: Config) -> pl.DataFrame:
         .pipe(unpivot)
         .pipe(
             compute_flux,
-            config.flux.flow_rate,
-            config.flux.soil_surface_area,
+            config.flux,
         )
         .pipe(blank_handler.run)
         .pipe(compute_statistics)

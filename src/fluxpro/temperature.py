@@ -24,9 +24,9 @@ def read_temperature(input_file: Path) -> pl.LazyFrame:
     return (
         lf.pipe(standardizer.standardize_datetime)
         .rename(name_mapping)
-        .pipe(_temperature_to_kelvin, temp_col_name)
+        .pipe(_fahrenheit_to_kelvin, temp_col_name)
     )
 
 
-def _temperature_to_kelvin(lf: pl.LazyFrame, temp_col_name: str):
+def _fahrenheit_to_kelvin(lf: pl.LazyFrame, temp_col_name: str):
     return lf.with_columns((pl.col(temp_col_name) - 32) * 5 / 9 + 273.15)
