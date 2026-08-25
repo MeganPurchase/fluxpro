@@ -90,7 +90,7 @@ class DataStandardizer:
         if "ppb" in name:
             return "ppb"
         if "Conc" in name:
-            return "ppm"
+            return "ppb"
         raise ValueError(f"failed to detect unit for column '{name}'")
 
     def _standardize_units(self, lf: pl.LazyFrame) -> pl.LazyFrame:
