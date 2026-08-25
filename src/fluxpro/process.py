@@ -87,6 +87,26 @@ def compute_statistics(lf: pl.LazyFrame) -> pl.LazyFrame:
     )
 
 
+def add_molar_volume_column(lf: pl.LazyFrame, temperature: float | Path) -> pl.LazyFrame:
+    """Add molar_volume column with units of L/mol"""
+
+    R = 0.082057366080960  # L*atm/K/mol
+    P = 1  # atm
+    match temperature:
+        case float():
+            return lf.with_columns(molar_volume=pl.lit(R * temperature / P))
+        case Path():
+            temperature_lf = read_temperature(temperature)
+            molar_volume_lf = temperature_lf.with_columns(
+                molar_volume=R * pl.col("temperature") / P
+            ).drop("temperature")
+            return lf.join_asof(
+                molar_volume_lf, on="datetime", strategy="nearest", check_sortedness=False
+            )
+        case _:
+            raise ValueError("invalid temperature")
+
+
 def compute_flux(lf: pl.LazyFrame, flux_config: Config.FluxConfig) -> pl.LazyFrame:
 
     nitrogen_mass = 14.006747
@@ -111,23 +131,10 @@ def compute_flux(lf: pl.LazyFrame, flux_config: Config.FluxConfig) -> pl.LazyFra
             ],
         }
     )
-    R = 0.082057366080960  # L*atm/K/mol
-    T = 298.15  # K
-    P = 1  # atm
     flow = flux_config.flow_rate
     soil_surface_area = flux_config.soil_surface_area
-    temperature = flux_config.temperature
 
-    match temperature:
-        case float():
-            T = temperature
-        case Path():
-            temperature_lf = read_temperature(temperature)
-            lf = lf.join_asof(
-                temperature_lf, on="datetime", strategy="nearest", check_sortedness=False
-            )
-
-    molar_volume = R * T / P  # L/mol
+    lf = add_molar_volume_column(lf, flux_config.temperature)
 
     # see https://amt.copernicus.org/articles/15/2807/2022/ for equation
     # conc          * flow  / soil_surface_area * molar_mass / molar_volume
@@ -141,9 +148,9 @@ def compute_flux(lf: pl.LazyFrame, flux_config: Config.FluxConfig) -> pl.LazyFra
             * flow
             / soil_surface_area
             * pl.col("molar_mass")
-            / molar_volume
+            / pl.col("molar_volume")
         )
-        .drop("concentration", "molar_mass")
+        .drop("concentration", "molar_mass", "molar_volume")
     )
 
 
