@@ -4,6 +4,7 @@ from datetime import timedelta
 
 from fluxpro.blank_handler import BlankHandler
 from fluxpro.data_standardizer import DataStandardizer
+from fluxpro.temperature import read_temperature
 import polars as pl
 
 from .config import Config
@@ -86,7 +87,27 @@ def compute_statistics(lf: pl.LazyFrame) -> pl.LazyFrame:
     )
 
 
-def compute_flux(lf: pl.LazyFrame, flow: float, soil_surface_area: float) -> pl.LazyFrame:
+def add_molar_volume_column(lf: pl.LazyFrame, temperature: float | Path) -> pl.LazyFrame:
+    """Add molar_volume column with units of L/mol"""
+
+    R = 0.082057366080960  # L*atm/K/mol
+    P = 1  # atm
+    match temperature:
+        case float():
+            return lf.with_columns(molar_volume=pl.lit(R * temperature / P))
+        case Path():
+            temperature_lf = read_temperature(temperature)
+            molar_volume_lf = temperature_lf.with_columns(
+                molar_volume=R * pl.col("temperature") / P
+            ).drop("temperature")
+            return lf.join_asof(
+                molar_volume_lf, on="datetime", strategy="nearest", check_sortedness=False
+            )
+        case _:
+            raise ValueError("invalid temperature")
+
+
+def compute_flux(lf: pl.LazyFrame, flux_config: Config.FluxConfig) -> pl.LazyFrame:
 
     nitrogen_mass = 14.006747
     carbon_mass = 12.0111
@@ -110,19 +131,26 @@ def compute_flux(lf: pl.LazyFrame, flow: float, soil_surface_area: float) -> pl.
             ],
         }
     )
-    nano = 1e9
+    flow = flux_config.flow_rate
+    soil_surface_area = flux_config.soil_surface_area
+
+    lf = add_molar_volume_column(lf, flux_config.temperature)
 
     # see https://amt.copernicus.org/articles/15/2807/2022/ for equation
-    # conc  * flow  / soil_surface_area * molar_mass * nano
-    # mol/L * L/min / m^2               * g/mol      * n
-    # concentration has units of mol/L from DataStandardizer
+    # conc          * flow  / soil_surface_area * molar_mass / molar_volume
+    # (ppb or nano) * L/min / m^2               * g/mol      / L/mol
+    # concentration has units of ppb from DataStandardizer
     # flux returned in units of ng/m^2/min
     return (
         lf.join(molar_masses, on="gas")
         .with_columns(
-            flux=pl.col("concentration") * flow / soil_surface_area * pl.col("molar_mass") * nano
+            flux=pl.col("concentration")
+            * flow
+            / soil_surface_area
+            * pl.col("molar_mass")
+            / pl.col("molar_volume")
         )
-        .drop("concentration", "molar_mass")
+        .drop("concentration", "molar_mass", "molar_volume")
     )
 
 
@@ -181,8 +209,7 @@ def process_file(input_file: Path, config: Config) -> pl.DataFrame:
         .pipe(unpivot)
         .pipe(
             compute_flux,
-            config.flux.flow_rate,
-            config.flux.soil_surface_area,
+            config.flux,
         )
         .pipe(blank_handler.run)
         .pipe(compute_statistics)

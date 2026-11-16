@@ -213,3 +213,32 @@ def test_integration_teledyne(data_dir: Path, tmp_path: Path, update_expected: b
         tmp_path=tmp_path,
         update_expected=update_expected,
     )
+
+
+def test_integration_teledyne_temperature(data_dir: Path, tmp_path: Path, update_expected: bool):
+
+    config = Config(
+        samples=Config.SampleConfig(
+            total_cycles=22,
+            samples_per_cycle=6,
+            minutes_per_sample=10,
+            discard_minutes=2,
+        ),
+        flux=Config.FluxConfig(
+            flow_rate=0.9,
+            soil_surface_area=0.007854,
+            temperature=data_dir / "temperature.csv",
+        ),
+        blank=Config.BlankConfig(
+            mode="multiplexed",
+            index=6,
+        ),
+    )
+
+    run_integration_case(
+        data_dir / "Teledyne27th.txt",
+        config,
+        expected_dir=data_dir / "expected/teledyne-temperature",
+        tmp_path=tmp_path,
+        update_expected=update_expected,
+    )

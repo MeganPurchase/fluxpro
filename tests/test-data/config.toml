@@ -13,6 +13,16 @@ discard_minutes = 2
 flow_rate = 0.1
 # surface area of the soil (m^2)
 soil_surface_area = 0.05
+# temperature used to calculate the molar volume:
+#   - fixed temperature (K)
+#   - path to a file containing the temperature timeseries
+#       File format:
+#       - .csv
+#       - first row: ignored
+#       - second row: column headers
+#       - first column: datetime values
+#       - second column: temperature in fahrenheit
+temperature = 298.15
 
 [blank]
 # specifies whether the blank is a multiplexed or a single cycle is used as the blank reading, options: 'multiplexed' or 'single'
